@@ -2,11 +2,10 @@ import XCTest
 @testable import ArcCore
 
 final class SystemActivityTests: XCTestCase {
-    func testInvalidLevelsAndMute() {
-        XCTAssertEqual(SystemActivity(kind: .brightness, level: .nan).level, 0)
-        XCTAssertEqual(SystemActivity(kind: .volume, level: 2).level, 1)
-        XCTAssertEqual(SystemActivity(kind: .volume, level: -1).level, 0)
-        XCTAssertEqual(SystemActivity(kind: .volume, level: 0.8, muted: true).symbol, "speaker.slash.fill")
+    func testInvalidBatteryLevels() {
+        XCTAssertEqual(SystemActivity(kind: .unplugged, level: .nan).level, 0)
+        XCTAssertEqual(SystemActivity(kind: .charging, level: 2).level, 1)
+        XCTAssertEqual(SystemActivity(kind: .charging, level: -1).level, 0)
     }
 
     func testPowerTransitionsAndFullCharge() {
@@ -38,11 +37,11 @@ final class SystemActivityTests: XCTestCase {
         model.receive(.media(track))
         model.hover(true)
         try await Task.sleep(for: .milliseconds(10))
-        model.showActivity(SystemActivity(kind: .volume, level: 0.5), duration: 30_000_000)
+        model.showActivity(SystemActivity(kind: .charging, level: 0.5), duration: 30_000_000)
         XCTAssertFalse(model.shouldTick)
-        model.showActivity(SystemActivity(kind: .brightness, level: 0.8), duration: 120_000_000)
+        model.showActivity(SystemActivity(kind: .unplugged, level: 0.8), duration: 120_000_000)
         try await Task.sleep(for: .milliseconds(60))
-        XCTAssertEqual(model.activity?.kind, .brightness)
+        XCTAssertEqual(model.activity?.kind, .unplugged)
         try await Task.sleep(for: .milliseconds(100))
         XCTAssertNil(model.activity)
         XCTAssertEqual(model.media, .media(track))
@@ -55,7 +54,7 @@ final class SystemActivityTests: XCTestCase {
         model.showActivity(SystemActivity(kind: .charging, level: 0.6))
         model.setEnabled(false)
         XCTAssertNil(model.activity)
-        model.showActivity(SystemActivity(kind: .volume, level: 1))
+        model.showActivity(SystemActivity(kind: .charging, level: 1))
         XCTAssertNil(model.activity)
         model.setEnabled(true)
         XCTAssertNil(model.activity)

@@ -4,7 +4,7 @@ A free, open-source Dynamic Island-style music companion for macOS 14+.
 Native SwiftUI and AppKit. No accounts, backend, telemetry, or subscriptions.
 
 **Local prototype:** compact now playing, hover-to-expand artwork and transport
-controls, live progress, paused and idle states, system level/battery indicators,
+controls, live progress, paused and idle states, battery indicators,
 and menu-bar settings.
 
 ## Build and run
@@ -71,26 +71,15 @@ unavailable state with a manual retry. Arc restarts the listener after wake.
 No Accessibility, Screen Recording, Notifications, or Automation permission is
 requested by Arc. The app is not sandboxed.
 
-Volume/mute changes show a brief white level indicator. Brightness feedback is
-triggered only by brightness-key presses, so ambient-light adjustments, wake
-restoration, and Control Center slider changes stay silent. Enable it from Arc's
-**Enable brightness key indicator…** menu item, grant **Input Monitoring** in
-System Settings, then relaunch Arc if macOS requests it. Arc uses a listen-only
-system-event tap, filters for brightness keys, and neither stores keyboard input
-nor intercepts the original event. Without permission, brightness feedback is off;
-music, volume, and battery still work. Local ad-hoc rebuilds may require renewed
-permission. The brightness level itself uses a dynamically loaded DisplayServices
-reader, only on key presses; there is no background brightness polling. Unsupported
-displays are skipped, with built-in displays preferred (no generic DDC/CI support).
-
 Power connection, disconnection, full charge, and low battery (20% and 10%) show
 battery feedback. Each indicator lasts 1.5 seconds after the latest change, then
 returns to music or idle. Battery status also appears in the menu. Monitoring
-pauses when hidden or asleep. Volume and battery use system notifications.
-macOS's own HUD remains visible.
+pauses when hidden or asleep and uses IOKit power-source notifications.
+Arc does not monitor volume, brightness, or keyboard input and requires no Input
+Monitoring permission. macOS handles volume and brightness feedback.
 
 Read-only local check: `dist/Arc.app/Contents/MacOS/Arc --system-smoke-test`.
-Hardware interaction testing (keys, output switching, plugging power) remains manual.
+Physical charger transition testing remains manual.
 
 The prototype has no timer, AirPods, general notifications, or multi-display
 islands. It also displays browser media when macOS reports it; there is no

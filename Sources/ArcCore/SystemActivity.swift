@@ -1,19 +1,15 @@
 import Foundation
 
 public struct SystemActivity: Equatable, Sendable {
-    public enum Kind: Sendable { case volume, brightness, charging, unplugged, lowBattery, charged }
+    public enum Kind: Sendable { case charging, unplugged, lowBattery, charged }
     public let kind: Kind
     public let level: Double
-    public let muted: Bool
-    public init(kind: Kind, level: Double, muted: Bool = false) {
+    public init(kind: Kind, level: Double) {
         self.kind = kind
         self.level = level.isFinite ? min(1, max(0, level)) : 0
-        self.muted = muted
     }
     public var title: String {
         switch kind {
-        case .volume: return muted ? "Muted" : "Volume"
-        case .brightness: return "Brightness"
         case .charging: return "Power connected"
         case .unplugged: return "On battery"
         case .lowBattery: return "Low battery"
@@ -22,8 +18,6 @@ public struct SystemActivity: Equatable, Sendable {
     }
     public var symbol: String {
         switch kind {
-        case .volume: return muted || level == 0 ? "speaker.slash.fill" : "speaker.wave.2.fill"
-        case .brightness: return "sun.max.fill"
         case .charging: return "bolt.fill"
         case .unplugged: return "battery.75percent"
         case .lowBattery: return "battery.25percent"

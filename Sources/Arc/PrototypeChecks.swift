@@ -14,7 +14,6 @@ import SwiftUI
                 monitor.onBattery = { hasBattery = $0 != nil }
                 monitor.start()
                 try? await Task.sleep(for: .seconds(1))
-                print(monitor.diagnostics())
                 print("Battery readable: \(hasBattery)")
                 monitor.stop()
                 exit(0)
@@ -64,13 +63,9 @@ import SwiftUI
                         ("notch-compact", .media(track()), false),
                         ("notch-expanded", .media(track()), true),
                         ("notch-paused", .media(track(playing: false)), true),
-                        ("notch-volume", .media(track()), false),
-                        ("notch-muted", .media(track()), false),
-                        ("notch-brightness", .idle, false),
                         ("notch-charging", .idle, false),
                         ("notch-low-battery", .idle, false),
-                        ("notch-charged", .idle, false),
-                        ("volume", .idle, false)
+                        ("notch-charged", .idle, false)
                     ]
                     for (name, state, expanded) in fixtures {
                         let coordinator = IslandCoordinator(provider: FixtureProvider(), enabled: true)
@@ -83,9 +78,6 @@ import SwiftUI
                         }
                         let activity: SystemActivity?
                         switch name {
-                        case "volume", "notch-volume": activity = SystemActivity(kind: .volume, level: 0.65)
-                        case "notch-muted": activity = SystemActivity(kind: .volume, level: 0.65, muted: true)
-                        case "notch-brightness": activity = SystemActivity(kind: .brightness, level: 0.8)
                         case "notch-charging": activity = SystemActivity(kind: .charging, level: 0.42)
                         case "notch-low-battery": activity = SystemActivity(kind: .lowBattery, level: 0.2)
                         case "notch-charged": activity = SystemActivity(kind: .charged, level: 1)

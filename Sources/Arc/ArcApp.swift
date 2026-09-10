@@ -34,21 +34,12 @@ private struct ArcMenu: View {
     @AppStorage("showIsland") private var showIsland = true
     @State private var loginEnabled = SMAppService.mainApp.status == .enabled
     @State private var loginMessage: String?
-    @State private var brightnessKeyAccess = CGPreflightListenEventAccess()
 
     var body: some View {
         Text("Arc · Music, within reach")
-            .onAppear {
-                brightnessKeyAccess = CGPreflightListenEventAccess()
-                coordinator.refreshBrightnessKeyAccess()
-            }
         Divider()
         Toggle("Show island", isOn: $showIsland)
             .onChange(of: showIsland) { _, enabled in coordinator.setEnabled(enabled) }
-        if !brightnessKeyAccess {
-            Button("Enable brightness key indicator…") { coordinator.enableBrightnessKeys() }
-            Text("Requires Input Monitoring; other indicators work without it.")
-        }
         Toggle("Launch at login", isOn: Binding(get: { loginEnabled }, set: setLogin))
         if let loginMessage { Text(loginMessage) }
         if SMAppService.mainApp.status == .requiresApproval {

@@ -60,7 +60,7 @@ struct IslandView: View {
     }
 
     private func activityView(_ activity: SystemActivity) -> some View {
-        let level = activity.muted ? 0 : activity.level
+        let level = activity.level
         return VStack(spacing: 10) {
             HStack(spacing: 9) {
                 Image(systemName: activity.symbol).frame(width: 22)
