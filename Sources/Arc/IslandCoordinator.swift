@@ -66,6 +66,9 @@ import SwiftUI
         window?.close()
     }
 
+    func enableBrightnessKeys() { systemMonitor.enableBrightnessKeys() }
+    func refreshBrightnessKeyAccess() { systemMonitor.refreshBrightnessKeyAccess() }
+
     func setEnabled(_ enabled: Bool) {
         model.setEnabled(enabled)
         if enabled && !sleeping { systemMonitor.start() }

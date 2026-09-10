@@ -71,18 +71,23 @@ unavailable state with a manual retry. Arc restarts the listener after wake.
 No Accessibility, Screen Recording, Notifications, or Automation permission is
 requested by Arc. The app is not sandboxed.
 
-Volume/mute and brightness changes now show a brief white level indicator.
+Volume/mute changes show a brief white level indicator. Brightness feedback is
+triggered only by brightness-key presses, so ambient-light adjustments, wake
+restoration, and Control Center slider changes stay silent. Enable it from Arc's
+**Enable brightness key indicator…** menu item, grant **Input Monitoring** in
+System Settings, then relaunch Arc if macOS requests it. Arc uses a listen-only
+system-event tap, filters for brightness keys, and neither stores keyboard input
+nor intercepts the original event. Without permission, brightness feedback is off;
+music, volume, and battery still work. Local ad-hoc rebuilds may require renewed
+permission. The brightness level itself uses a dynamically loaded DisplayServices
+reader, only on key presses; there is no background brightness polling. Unsupported
+displays are skipped, with built-in displays preferred (no generic DDC/CI support).
+
 Power connection, disconnection, full charge, and low battery (20% and 10%) show
 battery feedback. Each indicator lasts 1.5 seconds after the latest change, then
 returns to music or idle. Battery status also appears in the menu. Monitoring
-pauses when hidden or asleep. After display wake, Arc silently re-establishes
-brightness for at least two seconds and until stable for 750 ms, preventing
-the restore ramp from showing a HUD. Adjustments during this settling period
-still work, but do not show Arc’s indicator. Volume and battery use system notifications;
-brightness uses a dynamically loaded private DisplayServices reader at 250 ms
-intervals. Unsupported devices are skipped. Built-in brightness is preferred;
-generic DDC/CI monitors are not supported. Automatic brightness changes can also
-trigger feedback. macOS's own HUD remains visible: Arc does not intercept keys.
+pauses when hidden or asleep. Volume and battery use system notifications.
+macOS's own HUD remains visible.
 
 Read-only local check: `dist/Arc.app/Contents/MacOS/Arc --system-smoke-test`.
 Hardware interaction testing (keys, output switching, plugging power) remains manual.

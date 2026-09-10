@@ -8,8 +8,8 @@ import IOKit.ps
     var onBattery: ((BatteryReading?) -> Void)?
     private var batteryTransitions = BatteryTransitions()
     private var powerSource: CFRunLoopSource?
-    private var brightnessTimer: Timer?
-    private var brightnessChanges = BrightnessChanges()
+    private let brightnessKeys = BrightnessKeyMonitor()
+    private var brightnessReadTask: Task<Void, Never>?
     private var displaySleeping = false
     private var screenObservers: [NSObjectProtocol] = []
     private var displayID: CGDirectDisplayID?
@@ -35,7 +35,7 @@ import IOKit.ps
 
     #if DEBUG
     func diagnostics() -> String {
-        "Volume readable: \(sampleVolume() != nil); brightness readable: \(sampleBrightness() != nil)"
+        "Volume readable: \(sampleVolume() != nil); brightness readable: \(sampleBrightness() != nil); key access: \(CGPreflightListenEventAccess()); key listener active: \(brightnessKeys.isRunning)"
     }
     #endif
 
@@ -51,20 +51,21 @@ import IOKit.ps
         }, Unmanaged.passUnretained(self).toOpaque())?.takeRetainedValue()
         if let powerSource { CFRunLoopAddSource(CFRunLoopGetMain(), powerSource, .commonModes) }
         configureVolume()
+        brightnessKeys.onAdjustment = { [weak self] in self?.brightnessKeyPressed() }
+        brightnessKeys.start()
         displaySleeping = false
-        selectDisplay(forceReset: true)
+        selectDisplay()
         let workspace = NSWorkspace.shared.notificationCenter
         screenObservers.append(workspace.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
                 self?.displaySleeping = true
-                self?.brightnessTimer?.invalidate()
-                self?.brightnessTimer = nil
+                self?.brightnessReadTask?.cancel()
             }
         })
         screenObservers.append(workspace.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
                 self?.displaySleeping = false
-                self?.selectDisplay(forceReset: true)
+                self?.selectDisplay()
             }
         })
         displayObserver = NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
@@ -74,8 +75,9 @@ import IOKit.ps
 
     func stop() {
         enabled = false
-        brightnessTimer?.invalidate()
-        brightnessTimer = nil
+        brightnessReadTask?.cancel()
+        brightnessReadTask = nil
+        brightnessKeys.stop()
         if let powerSource { CFRunLoopSourceInvalidate(powerSource) }
         powerSource = nil
         for (object, var address, listener) in volumeListeners {
@@ -106,29 +108,33 @@ import IOKit.ps
         onBattery?(nil)
     }
 
-    private func selectDisplay(forceReset: Bool = false) {
+    private func selectDisplay() {
         guard enabled && !displaySleeping else { return }
         let screen = NSScreen.screens.first(where: { screen in
             let id = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? 0
             return CGDisplayIsBuiltin(id) != 0
         }) ?? NSScreen.screens.first
         let id = (screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
-        guard forceReset || displayID != id || brightnessTimer == nil else { return }
+        guard displayID != id else { return }
         displayID = id
-        brightnessChanges.reset(at: ProcessInfo.processInfo.systemUptime)
-        brightnessTimer?.invalidate()
-        brightnessTimer = nil
-        guard sampleBrightness() != nil else { return }
-        if let value = sampleBrightness() {
-            _ = brightnessChanges.receive(value, at: ProcessInfo.processInfo.systemUptime)
+        brightnessReadTask?.cancel()
+    }
+
+    func enableBrightnessKeys() {
+        // Request access only after the user selects the menu action.
+        if CGPreflightListenEventAccess() {
+            if enabled { brightnessKeys.start() }
+        } else {
+            _ = CGRequestListenEventAccess()
+            if let settings = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
+                NSWorkspace.shared.open(settings)
+            }
         }
-        // Read-only SPI has no public change subscription. Poll only while visible and awake.
-        let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refreshBrightness() }
-        }
-        timer.tolerance = 0.05
-        brightnessTimer = timer
-        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    func refreshBrightnessKeyAccess() {
+        guard enabled else { return }
+        brightnessKeys.start()
     }
 
     private func sampleBrightness() -> Int? {
@@ -138,17 +144,21 @@ import IOKit.ps
         return Int((min(1, value) * 100).rounded())
     }
 
-    private func refreshBrightness() {
-        guard enabled else { return }
-        guard let value = sampleBrightness() else {
-            brightnessTimer?.invalidate()
-            brightnessTimer = nil
-            brightnessChanges.reset(at: ProcessInfo.processInfo.systemUptime)
-            return
+    private func brightnessKeyPressed() {
+        guard enabled && !displaySleeping else { return }
+        brightnessReadTask?.cancel()
+        // Immediate feedback while a key repeats; a trailing read captures the final level.
+        showBrightness()
+        brightnessReadTask = Task { [weak self] in
+            do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
+            guard let self, self.enabled && !self.displaySleeping else { return }
+            self.showBrightness()
         }
-        if brightnessChanges.receive(value, at: ProcessInfo.processInfo.systemUptime) {
-            onActivity?(SystemActivity(kind: .brightness, level: Double(value) / 100))
-        }
+    }
+
+    private func showBrightness() {
+        guard let value = sampleBrightness() else { return }
+        onActivity?(SystemActivity(kind: .brightness, level: Double(value) / 100))
     }
 
     private func configureVolume() {
