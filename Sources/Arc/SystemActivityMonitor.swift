@@ -9,7 +9,9 @@ import IOKit.ps
     private var batteryTransitions = BatteryTransitions()
     private var powerSource: CFRunLoopSource?
     private var brightnessTimer: Timer?
-    private var lastBrightness: Int?
+    private var brightnessChanges = BrightnessChanges()
+    private var displaySleeping = false
+    private var screenObservers: [NSObjectProtocol] = []
     private var displayID: CGDirectDisplayID?
     private var device = AudioDeviceID(kAudioObjectUnknown)
     private var lastVolume: SystemActivity?
@@ -49,7 +51,22 @@ import IOKit.ps
         }, Unmanaged.passUnretained(self).toOpaque())?.takeRetainedValue()
         if let powerSource { CFRunLoopAddSource(CFRunLoopGetMain(), powerSource, .commonModes) }
         configureVolume()
-        selectDisplay()
+        displaySleeping = false
+        selectDisplay(forceReset: true)
+        let workspace = NSWorkspace.shared.notificationCenter
+        screenObservers.append(workspace.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in
+                self?.displaySleeping = true
+                self?.brightnessTimer?.invalidate()
+                self?.brightnessTimer = nil
+            }
+        })
+        screenObservers.append(workspace.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in
+                self?.displaySleeping = false
+                self?.selectDisplay(forceReset: true)
+            }
+        })
         displayObserver = NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.selectDisplay() }
         }
@@ -67,6 +84,8 @@ import IOKit.ps
         volumeListeners.removeAll()
         if let displayObserver { NotificationCenter.default.removeObserver(displayObserver) }
         displayObserver = nil
+        screenObservers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
+        screenObservers.removeAll()
     }
 
     private func refreshBattery() {
@@ -87,20 +106,22 @@ import IOKit.ps
         onBattery?(nil)
     }
 
-    private func selectDisplay() {
-        guard enabled else { return }
+    private func selectDisplay(forceReset: Bool = false) {
+        guard enabled && !displaySleeping else { return }
         let screen = NSScreen.screens.first(where: { screen in
             let id = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? 0
             return CGDisplayIsBuiltin(id) != 0
         }) ?? NSScreen.screens.first
         let id = (screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
-        guard displayID != id || brightnessTimer == nil else { return }
+        guard forceReset || displayID != id || brightnessTimer == nil else { return }
         displayID = id
-        lastBrightness = nil
+        brightnessChanges.reset(at: ProcessInfo.processInfo.systemUptime)
         brightnessTimer?.invalidate()
         brightnessTimer = nil
         guard sampleBrightness() != nil else { return }
-        lastBrightness = sampleBrightness()
+        if let value = sampleBrightness() {
+            _ = brightnessChanges.receive(value, at: ProcessInfo.processInfo.systemUptime)
+        }
         // Read-only SPI has no public change subscription. Poll only while visible and awake.
         let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshBrightness() }
@@ -122,11 +143,10 @@ import IOKit.ps
         guard let value = sampleBrightness() else {
             brightnessTimer?.invalidate()
             brightnessTimer = nil
-            lastBrightness = nil
+            brightnessChanges.reset(at: ProcessInfo.processInfo.systemUptime)
             return
         }
-        defer { lastBrightness = value }
-        if let previous = lastBrightness, value != previous {
+        if brightnessChanges.receive(value, at: ProcessInfo.processInfo.systemUptime) {
             onActivity?(SystemActivity(kind: .brightness, level: Double(value) / 100))
         }
     }

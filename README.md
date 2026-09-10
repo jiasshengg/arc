@@ -75,7 +75,10 @@ Volume/mute and brightness changes now show a brief white level indicator.
 Power connection, disconnection, full charge, and low battery (20% and 10%) show
 battery feedback. Each indicator lasts 1.5 seconds after the latest change, then
 returns to music or idle. Battery status also appears in the menu. Monitoring
-pauses when hidden or asleep. Volume and battery use system notifications;
+pauses when hidden or asleep. After display wake, Arc silently re-establishes
+brightness for at least two seconds and until stable for 750 ms, preventing
+the restore ramp from showing a HUD. Adjustments during this settling period
+still work, but do not show Arc’s indicator. Volume and battery use system notifications;
 brightness uses a dynamically loaded private DisplayServices reader at 250 ms
 intervals. Unsupported devices are skipped. Built-in brightness is preferred;
 generic DDC/CI monitors are not supported. Automatic brightness changes can also
