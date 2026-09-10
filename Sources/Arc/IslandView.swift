@@ -194,7 +194,6 @@ struct IslandView: View {
             Image(systemName: symbol)
                 .font(.system(size: prominent ? 18 : 14, weight: .semibold))
                 .frame(width: 44, height: 44)
-                .background(prominent ? .white.opacity(0.13) : .clear, in: Circle())
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
