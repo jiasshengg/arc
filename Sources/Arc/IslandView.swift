@@ -10,6 +10,9 @@ struct IslandView: View {
     private let chargingGreen = Color(red: 52 / 255, green: 199 / 255, blue: 89 / 255)
 
     private var attached: Bool { model.notchSize.height > 0 }
+    private var activityTransition: AnyTransition {
+        reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.96))
+    }
     private var size: CGSize {
         if model.activity != nil {
             return IslandLayout.activitySize(expanded: model.expanded, notch: model.notchSize)
@@ -30,11 +33,11 @@ struct IslandView: View {
                 if model.expanded {
                     activityView(activity)
                         .padding(.top, model.notchSize.height)
-                        .transition(.opacity)
+                        .transition(activityTransition)
                 } else {
                     compactActivityView(activity)
                         .frame(width: size.width, height: size.height)
-                        .transition(.opacity)
+                        .transition(activityTransition)
                 }
             } else if model.expanded {
                 Group {
@@ -50,6 +53,7 @@ struct IslandView: View {
                     .transition(.opacity)
             }
         }
+        .animation(reduceMotion ? .easeOut(duration: 0.12) : .easeInOut(duration: 0.22), value: model.activity)
         .frame(width: size.width, height: size.height, alignment: .top)
         .background(.black, in: outline)
         .foregroundStyle(.white)
