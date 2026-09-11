@@ -74,6 +74,11 @@ public enum IslandLayout {
             : (hasMedia ? CGSize(width: 240, height: 40) : CGSize(width: 72, height: 12))
     }
 
+    public static func activitySize(expanded: Bool, notch: CGSize = .zero) -> CGSize {
+        guard expanded else { return size(expanded: false, hasMedia: true, notch: notch) }
+        return CGSize(width: max(280, notch.width + 88), height: notch.height + 64)
+    }
+
     public static func frame(screen: CGRect, visible: CGRect, safeTop: CGFloat, size: CGSize) -> CGRect {
         let top = safeTop > 0 ? screen.maxY : visible.maxY - 8
         let width = min(size.width, screen.width)

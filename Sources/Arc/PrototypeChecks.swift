@@ -64,6 +64,7 @@ import SwiftUI
                         ("notch-expanded", .media(track()), true),
                         ("notch-paused", .media(track(playing: false)), true),
                         ("notch-charging", .idle, false),
+                        ("notch-charging-expanded", .media(track()), true),
                         ("notch-low-battery", .idle, false),
                         ("notch-charged", .idle, false)
                     ]
@@ -78,7 +79,7 @@ import SwiftUI
                         }
                         let activity: SystemActivity?
                         switch name {
-                        case "notch-charging": activity = SystemActivity(kind: .charging, level: 0.42)
+                        case "notch-charging", "notch-charging-expanded": activity = SystemActivity(kind: .charging, level: 0.42)
                         case "notch-low-battery": activity = SystemActivity(kind: .lowBattery, level: 0.2)
                         case "notch-charged": activity = SystemActivity(kind: .charged, level: 1)
                         default: activity = nil
@@ -86,7 +87,7 @@ import SwiftUI
                         if let activity { coordinator.model.showActivity(activity) }
                         let size = activity == nil
                             ? IslandLayout.size(expanded: expanded, hasMedia: state.snapshot != nil, notch: notch)
-                            : CGSize(width: max(280, notch.width + 88), height: notch.height + 64)
+                            : IslandLayout.activitySize(expanded: expanded, notch: notch)
                         let view = IslandView(coordinator: coordinator).frame(width: size.width, height: size.height)
                         let renderer = ImageRenderer(content: view)
                         renderer.scale = 2

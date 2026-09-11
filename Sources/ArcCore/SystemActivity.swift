@@ -18,7 +18,7 @@ public struct SystemActivity: Equatable, Sendable {
     }
     public var symbol: String {
         switch kind {
-        case .charging: return "bolt.fill"
+        case .charging: return "battery.100percent.bolt"
         case .unplugged: return "battery.75percent"
         case .lowBattery: return "battery.25percent"
         case .charged: return "battery.100percent"

@@ -93,6 +93,13 @@ final class ArcCoreTests: XCTestCase {
         }
     }
 
+    func testActivityLayoutOnlyExpandsWithIsland() {
+        let notch = CGSize(width: 192, height: 32)
+        XCTAssertEqual(IslandLayout.activitySize(expanded: false, notch: notch), CGSize(width: 280, height: 34))
+        XCTAssertEqual(IslandLayout.activitySize(expanded: true, notch: notch), CGSize(width: 280, height: 96))
+        XCTAssertEqual(IslandLayout.activitySize(expanded: false), CGSize(width: 240, height: 40))
+    }
+
     @MainActor func testHoverCancellationAndVisibility() async throws {
         let model = IslandModel(enterDelay: 10_000_000, exitDelay: 30_000_000)
         model.hover(true)

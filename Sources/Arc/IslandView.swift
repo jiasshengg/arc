@@ -11,7 +11,7 @@ struct IslandView: View {
     private var attached: Bool { model.notchSize.height > 0 }
     private var size: CGSize {
         if model.activity != nil {
-            return CGSize(width: max(280, model.notchSize.width + 88), height: model.notchSize.height + 64)
+            return IslandLayout.activitySize(expanded: model.expanded, notch: model.notchSize)
         }
         return IslandLayout.size(expanded: model.expanded, hasMedia: model.media.snapshot != nil, notch: model.notchSize)
     }
@@ -26,9 +26,15 @@ struct IslandView: View {
     var body: some View {
         ZStack(alignment: .top) {
             if let activity = model.activity {
-                activityView(activity)
-                    .padding(.top, model.notchSize.height)
-                    .transition(.opacity)
+                if model.expanded {
+                    activityView(activity)
+                        .padding(.top, model.notchSize.height)
+                        .transition(.opacity)
+                } else {
+                    compactActivityView(activity)
+                        .frame(width: size.width, height: size.height)
+                        .transition(.opacity)
+                }
             } else if model.expanded {
                 Group {
                     if let track = model.media.snapshot { expanded(track) }
@@ -63,7 +69,8 @@ struct IslandView: View {
         let level = activity.level
         return VStack(spacing: 10) {
             HStack(spacing: 9) {
-                Image(systemName: activity.symbol).frame(width: 22)
+                Image(systemName: activity.symbol)
+                    .frame(width: 22)
                 Text(activity.title).font(.system(size: 12, weight: .medium))
                 Spacer()
                 Text("\(Int((level * 100).rounded()))%")
@@ -83,6 +90,30 @@ struct IslandView: View {
         .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: activity.level)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(activity.title), \(Int((level * 100).rounded())) percent")
+    }
+
+    private func compactActivityView(_ activity: SystemActivity) -> some View {
+        let percentage = "\(Int((activity.level * 100).rounded()))%"
+        return Group {
+            if attached {
+                HStack(spacing: 0) {
+                    Image(systemName: activity.symbol)
+                        .frame(width: 44)
+                    Color.clear.frame(width: model.notchSize.width)
+                    Text(percentage).frame(width: 44)
+                }
+            } else {
+                HStack(spacing: 10) {
+                    Image(systemName: activity.symbol)
+                    Spacer(minLength: 0)
+                    Text(percentage)
+                }
+                .padding(.horizontal, 12)
+            }
+        }
+        .font(.system(size: 11, weight: .medium, design: .monospaced))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(activity.title), \(percentage)")
     }
 
     @ViewBuilder private var compact: some View {
