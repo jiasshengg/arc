@@ -7,6 +7,7 @@ struct IslandView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var model: IslandModel { coordinator.model }
     private let accent = Color.white
+    private let chargingGreen = Color(red: 52 / 255, green: 199 / 255, blue: 89 / 255)
 
     private var attached: Bool { model.notchSize.height > 0 }
     private var size: CGSize {
@@ -70,6 +71,7 @@ struct IslandView: View {
         return VStack(spacing: 10) {
             HStack(spacing: 9) {
                 Image(systemName: activity.symbol)
+                    .foregroundStyle(activityColor(activity))
                     .frame(width: 22)
                 Text(activity.title).font(.system(size: 12, weight: .medium))
                 Spacer()
@@ -98,6 +100,7 @@ struct IslandView: View {
             if attached {
                 HStack(spacing: 0) {
                     Image(systemName: activity.symbol)
+                        .foregroundStyle(activityColor(activity))
                         .frame(width: 44)
                     Color.clear.frame(width: model.notchSize.width)
                     Text(percentage).frame(width: 44)
@@ -105,6 +108,7 @@ struct IslandView: View {
             } else {
                 HStack(spacing: 10) {
                     Image(systemName: activity.symbol)
+                        .foregroundStyle(activityColor(activity))
                     Spacer(minLength: 0)
                     Text(percentage)
                 }
@@ -114,6 +118,13 @@ struct IslandView: View {
         .font(.system(size: 11, weight: .medium, design: .monospaced))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(activity.title), \(percentage)")
+    }
+
+    private func activityColor(_ activity: SystemActivity) -> Color {
+        switch activity.kind {
+        case .charging: chargingGreen
+        default: .white
+        }
     }
 
     @ViewBuilder private var compact: some View {
