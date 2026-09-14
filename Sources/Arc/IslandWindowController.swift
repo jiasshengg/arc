@@ -29,10 +29,12 @@ private final class IslandPanel: NSPanel {
         panel.isMovable = false
         panel.isReleasedWhenClosed = false
         panel.animationBehavior = .none
-        let hosting = NSHostingView(rootView: IslandView(coordinator: coordinator, onSizeChange: { [weak self] size in
+        let hosting = PocketHostingView(rootView: IslandView(coordinator: coordinator, onSizeChange: { [weak self] size in
             self?.visibleSize = size
             self?.trackPointer()
         }))
+        hosting.model = coordinator.model
+        hosting.registerForDraggedTypes([.fileURL])
         hosting.sizingOptions = []
         panel.contentView = hosting
         observeModel()
@@ -43,11 +45,11 @@ private final class IslandPanel: NSPanel {
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.present() }
         })
-        localMouse = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .rightMouseDown]) { [weak self] event in
+        localMouse = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged, .leftMouseUp, .leftMouseDown, .rightMouseDown]) { [weak self] event in
             self?.trackPointer()
             return event
         }
-        globalMouse = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .rightMouseDown]) { [weak self] _ in
+        globalMouse = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged, .leftMouseUp, .leftMouseDown, .rightMouseDown]) { [weak self] _ in
             self?.trackPointer()
         }
         panel.acceptsMouseMovedEvents = true
@@ -80,7 +82,7 @@ private final class IslandPanel: NSPanel {
                                           leftArea: screen.auxiliaryTopLeftArea, rightArea: screen.auxiliaryTopRightArea)
         coordinator.model.setNotchSize(notch)
         // A stationary canvas avoids competing AppKit and SwiftUI layout animations.
-        var canvas = IslandLayout.size(expanded: true, hasMedia: true, notch: notch)
+        var canvas = IslandLayout.pocketSize(expanded: true, count: Pocket.islandCapacity, receiving: false, notch: notch)
         canvas.width += 24
         canvas.height += 16
         let frame = IslandLayout.frame(screen: screen.frame, visible: screen.visibleFrame, safeTop: notch.height, size: canvas)
@@ -102,7 +104,7 @@ private final class IslandPanel: NSPanel {
         let squareTop = attached && CGRect(x: rect.minX, y: rect.maxY - radius, width: rect.width, height: radius).contains(point)
         let nowInside = shape.contains(point) || squareTop
         // Transparent rounded corners must not swallow clicks intended for the app below.
-        panel.ignoresMouseEvents = !nowInside
+        panel.ignoresMouseEvents = !nowInside && !coordinator.model.receivingFiles && !coordinator.model.draggingFileOut
         if nowInside != inside {
             inside = nowInside
             coordinator.model.hover(nowInside)

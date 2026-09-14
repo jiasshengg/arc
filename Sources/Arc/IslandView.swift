@@ -14,6 +14,10 @@ struct IslandView: View {
         reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.96))
     }
     private var size: CGSize {
+        if model.showsPocket {
+            return IslandLayout.pocketSize(expanded: model.expanded, count: model.pocket.islandItems.count,
+                                           receiving: model.receivingFiles, notch: model.notchSize)
+        }
         if model.activity != nil {
             return IslandLayout.activitySize(expanded: model.expanded, notch: model.notchSize)
         }
@@ -29,7 +33,30 @@ struct IslandView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            if let activity = model.activity {
+            if model.showsPocket {
+                if model.expanded {
+                    Group {
+                        if model.receivingFiles {
+                            VStack(spacing: 8) {
+                                Image(systemName: "tray.and.arrow.down").font(.system(size: 24))
+                                Text(model.dropMessage).font(.system(size: 13, weight: .medium))
+                                Text("Files and folders · References only").font(.system(size: 10)).foregroundStyle(.gray)
+                            }.frame(height: 100)
+                        } else { PocketView(model: model, onOpenPocket: coordinator.showPocket) }
+                    }
+                    .frame(width: max(380, model.notchSize.width + 88))
+                    .padding(.top, model.notchSize.height)
+                    .transition(.opacity)
+                } else {
+                    HStack(spacing: 0) {
+                        Image(systemName: "doc.on.doc.fill").frame(width: 44)
+                        if attached { Color.clear.frame(width: model.notchSize.width) }
+                        else { Text("Pocket").font(.system(size: 12, weight: .medium)); Spacer() }
+                        Text("\(model.pocket.items.count)").font(.system(size: 12, weight: .semibold)).frame(width: 44)
+                    }.frame(width: size.width, height: size.height)
+                    .accessibilityLabel("Pocket, \(model.pocket.items.count) held items")
+                }
+            } else if let activity = model.activity {
                 if model.expanded {
                     activityView(activity)
                         .padding(.top, model.notchSize.height)
@@ -64,9 +91,9 @@ struct IslandView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .ignoresSafeArea()
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Arc media player")
-        .accessibilityAction(named: "Expand player") { model.hover(true) }
-        .accessibilityAction(named: "Collapse player") { model.collapse() }
+        .accessibilityLabel("Arc island")
+        .accessibilityAction(named: "Expand island") { model.hover(true) }
+        .accessibilityAction(named: "Collapse island") { model.collapse() }
         .preferredColorScheme(.dark)
     }
 

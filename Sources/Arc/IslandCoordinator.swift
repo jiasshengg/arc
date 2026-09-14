@@ -13,6 +13,7 @@ import SwiftUI
     @ObservationIgnored private let provider: NowPlayingProviding
     @ObservationIgnored private var updates: Task<Void, Never>?
     @ObservationIgnored private var window: IslandWindowController?
+    @ObservationIgnored private var pocketWindow: PocketWindowController?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
 
     init(provider: NowPlayingProviding, enabled: Bool) {
@@ -22,6 +23,7 @@ import SwiftUI
 
     func start() {
         window = IslandWindowController(coordinator: self)
+        pocketWindow = PocketWindowController(model: model)
         systemMonitor.onActivity = { [weak self] activity in
             self?.model.showActivity(activity)
         }
@@ -64,6 +66,7 @@ import SwiftUI
         observers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
         observers.removeAll()
         window?.close()
+        pocketWindow?.close()
     }
 
     func setEnabled(_ enabled: Bool) {
@@ -81,6 +84,10 @@ import SwiftUI
         provider.stop()
         model.receive(.idle)
         provider.start()
+    }
+
+    func showPocket() {
+        pocketWindow?.show()
     }
 
     private static func decodeArtwork(_ data: Data?) async -> NSImage? {

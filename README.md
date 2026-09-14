@@ -4,7 +4,7 @@ A free, open-source Dynamic Island-style music companion for macOS 14+.
 Native SwiftUI and AppKit. No accounts, backend, telemetry, or subscriptions.
 
 **Local prototype:** compact now playing, hover-to-expand artwork and transport
-controls, live progress, paused and idle states, battery indicators,
+controls, live progress, paused and idle states, battery indicators, Pocket file shelf,
 and menu-bar settings.
 
 ## Build and run
@@ -27,6 +27,22 @@ location before enabling it.
 Open `Package.swift` in Xcode to edit and run tests. Use the script to run the
 complete app: `swift run` alone does not bundle the media helper and will show
 “Media integration unavailable.” The build targets the current Mac's architecture.
+
+## Pocket
+
+Drag files or folders from Finder onto the island. The first five remain in the
+island for quick access; additional items appear in the separate Pocket window.
+Open it with **More** in the expanded island or **Open Pocket…** in Arc’s menu.
+Drag any row into Finder, Mail, Messages, or a file upload target. Use the row’s
+× or **Clear** to remove references. Items remain after drag-out and last until
+removed or Arc quits.
+
+Pocket stores original file paths only: no duplicate files, uploads, or new
+permissions. Moved/deleted originals show a warning when the shelf is open.
+Duplicates are ignored; valid overflow items are accepted into More in Pocket.
+Incoming drags take priority over music and battery feedback. Text, browser image
+data, and promised files are not supported. Cross-app drag compatibility still
+needs hands-on validation.
 
 ## Verify
 

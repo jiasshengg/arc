@@ -59,6 +59,11 @@ private struct ArcMenu: View {
             Text("Battery: \(battery.percent)% · \(battery.charging ? "Charging" : (battery.pluggedIn ? "Plugged in" : "On battery"))")
             Divider()
         }
+        Text("Pocket: \(coordinator.model.pocket.items.count) items")
+        Button("Open Pocket…") { coordinator.showPocket() }
+        Button("Clear") { coordinator.model.pocket.clear() }
+            .disabled(coordinator.model.pocket.items.isEmpty)
+        Divider()
         Button("Quit Arc") { NSApp.terminate(nil) }.keyboardShortcut("q")
     }
 
