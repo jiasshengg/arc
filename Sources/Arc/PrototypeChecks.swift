@@ -68,6 +68,8 @@ import SwiftUI
                         ("notch-compact", .media(track()), false),
                         ("notch-expanded", .media(track()), true),
                         ("notch-paused", .media(track(playing: false)), true),
+                        ("screenshot-expanded", .idle, true),
+                        ("notch-screenshot", .idle, false),
                         ("notch-charging", .idle, false),
                         ("notch-charging-expanded", .media(track()), true),
                         ("notch-low-battery", .idle, false),
@@ -98,6 +100,10 @@ import SwiftUI
                                 coordinator.model.pocket.refresh()
                             }
                         }
+                        if name.contains("screenshot"),
+                           let image = NSImage(systemSymbolName: "rectangle.dashed", accessibilityDescription: nil) {
+                            coordinator.showScreenshot(image)
+                        }
                         let activity: SystemActivity?
                         switch name {
                         case "notch-charging", "notch-charging-expanded": activity = SystemActivity(kind: .charging, level: 0.42)
@@ -109,6 +115,8 @@ import SwiftUI
                         let size = coordinator.model.showsPocket
                             ? IslandLayout.pocketSize(expanded: expanded, count: coordinator.model.pocket.islandItems.count,
                                                       receiving: coordinator.model.receivingFiles, notch: notch)
+                            : coordinator.model.screenshotCopied
+                            ? IslandLayout.activitySize(expanded: expanded, notch: notch)
                             : activity == nil
                             ? IslandLayout.size(expanded: expanded, hasMedia: state.snapshot != nil, notch: notch)
                             : IslandLayout.activitySize(expanded: expanded, notch: notch)

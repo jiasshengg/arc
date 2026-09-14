@@ -59,4 +59,30 @@ final class SystemActivityTests: XCTestCase {
         model.setEnabled(true)
         XCTAssertNil(model.activity)
     }
+
+    @MainActor func testScreenshotFeedbackPausesMediaAndExpires() async throws {
+        let model = IslandModel(enterDelay: 0)
+        model.receive(.media(NowPlayingSnapshot(title: "Test", isPlaying: true)))
+        model.hover(true)
+        try await Task.sleep(for: .milliseconds(10))
+        model.showScreenshotCopied(duration: 30_000_000)
+        XCTAssertTrue(model.screenshotCopied)
+        XCTAssertFalse(model.shouldTick)
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertFalse(model.screenshotCopied)
+        XCTAssertTrue(model.shouldTick)
+    }
+
+    @MainActor func testExpandedPocketKeepsPriorityOverScreenshot() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try Data().write(to: directory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = IslandModel(enterDelay: 0)
+        XCTAssertTrue(model.pocket.hold([directory]))
+        model.showScreenshotCopied()
+        XCTAssertFalse(model.showsPocket)
+        model.hover(true)
+        try await Task.sleep(for: .milliseconds(10))
+        XCTAssertTrue(model.showsPocket)
+    }
 }

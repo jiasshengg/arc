@@ -5,7 +5,7 @@ Native SwiftUI and AppKit. No accounts, backend, telemetry, or subscriptions.
 
 **Local prototype:** compact now playing, hover-to-expand artwork and transport
 controls, live progress, paused and idle states, battery indicators, Pocket file shelf,
-and menu-bar settings.
+automatic screenshot copying, and menu-bar settings.
 
 ## Build and run
 
@@ -43,6 +43,21 @@ Duplicates are ignored; valid overflow items are accepted into More in Pocket.
 Incoming drags take priority over music and battery feedback. Text, browser image
 data, and promised files are not supported. Cross-app drag compatibility still
 needs hands-on validation.
+
+## Screenshots
+
+Take a normal macOS screenshot with **Shift-Command-3** or
+**Shift-Command-4**. Arc watches the screenshot folder configured in macOS,
+copies each newly saved system screenshot to the clipboard, and briefly shows
+its preview with “Screenshot copied” in the island. The original screenshot
+file remains where macOS saved it.
+
+Arc identifies captures using macOS file metadata, so ordinary images added to
+the folder are ignored. The configured folder is read when Arc launches; restart
+Arc after changing the screenshot save location. Folder access may require the
+standard macOS Files and Folders approval. Captures made with the extra Control
+key already go directly to the clipboard and do not create a file for Arc to
+detect.
 
 ## Verify
 
@@ -93,6 +108,12 @@ returns to music or idle. Battery status also appears in the menu. Monitoring
 pauses when hidden or asleep and uses IOKit power-source notifications.
 Arc does not monitor volume, brightness, or keyboard input and requires no Input
 Monitoring permission. macOS handles volume and brightness feedback.
+
+Screenshot monitoring uses file-system events in the configured capture folder
+and macOS's screenshot metadata. Arc does not capture the screen or request
+Screen Recording permission; it reads only newly appearing capture files and
+places their decoded images on the system pasteboard. Monitoring pauses during
+sleep and resumes after wake.
 
 Read-only local check: `dist/Arc.app/Contents/MacOS/Arc --system-smoke-test`.
 Physical charger transition testing remains manual.

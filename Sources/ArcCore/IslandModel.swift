@@ -10,7 +10,7 @@ import Observation
         didSet { if draggingFileOut { hoverTask?.cancel() } }
     }
     public var showsPocket: Bool {
-        receivingFiles || (!pocket.items.isEmpty && (expanded || activity == nil))
+        receivingFiles || (!pocket.items.isEmpty && (expanded || (activity == nil && !screenshotCopied)))
     }
 
     public func setReceivingFiles(_ receiving: Bool) {
@@ -24,6 +24,8 @@ import Observation
     public private(set) var expanded = false
     public private(set) var activity: SystemActivity?
     @ObservationIgnored private var activityTask: Task<Void, Never>?
+    public private(set) var screenshotCopied = false
+    @ObservationIgnored private var screenshotTask: Task<Void, Never>?
 
     public func showActivity(_ activity: SystemActivity, duration: UInt64 = 1_500_000_000) {
         guard enabled else { return }
@@ -40,13 +42,27 @@ import Observation
         activity = nil
     }
 
+    public func showScreenshotCopied(duration: UInt64 = 1_500_000_000) {
+        guard enabled else { return }
+        screenshotTask?.cancel()
+        screenshotCopied = true
+        screenshotTask = Task { [weak self] in
+            do { try await Task.sleep(nanoseconds: duration) } catch { return }
+            self?.screenshotCopied = false
+        }
+    }
+
+    public func clearScreenshotFeedback() {
+        screenshotTask?.cancel()
+        screenshotCopied = false
+    }
     public private(set) var notchSize: CGSize = .zero
     public func setNotchSize(_ size: CGSize) { notchSize = size }
     public private(set) var enabled: Bool
     @ObservationIgnored private var hoverTask: Task<Void, Never>?
     @ObservationIgnored private let enterDelay: UInt64
     @ObservationIgnored private let exitDelay: UInt64
-    public var shouldTick: Bool { enabled && expanded && !showsPocket && activity == nil && media.snapshot?.isPlaying == true }
+    public var shouldTick: Bool { enabled && expanded && !showsPocket && activity == nil && !screenshotCopied && media.snapshot?.isPlaying == true }
 
     public init(enabled: Bool = true, enterDelay: UInt64 = 100_000_000, exitDelay: UInt64 = 100_000_000) {
         self.enabled = enabled
@@ -57,7 +73,7 @@ import Observation
     public func receive(_ state: MediaState) { media = state }
     public func setEnabled(_ enabled: Bool) {
         self.enabled = enabled
-        if !enabled { receivingFiles = false; collapse(); clearActivity() }
+        if !enabled { receivingFiles = false; collapse(); clearActivity(); clearScreenshotFeedback() }
     }
     public func collapse() {
         hoverTask?.cancel()

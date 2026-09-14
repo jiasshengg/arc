@@ -7,8 +7,10 @@ import SwiftUI
 @MainActor @Observable final class IslandCoordinator {
     let model: IslandModel
     private(set) var artwork: NSImage?
+    private(set) var screenshot: NSImage?
     private(set) var battery: BatteryReading?
     @ObservationIgnored private let systemMonitor = SystemActivityMonitor()
+    @ObservationIgnored private let screenshotMonitor = ScreenshotMonitor()
     @ObservationIgnored private var sleeping = false
     @ObservationIgnored private let provider: NowPlayingProviding
     @ObservationIgnored private var updates: Task<Void, Never>?
@@ -28,6 +30,8 @@ import SwiftUI
             self?.model.showActivity(activity)
         }
         systemMonitor.onBattery = { [weak self] reading in self?.battery = reading }
+        screenshotMonitor.onScreenshot = { [weak self] image in self?.showScreenshot(image) }
+        screenshotMonitor.start()
         if model.enabled { systemMonitor.start() }
         updates = Task { [weak self, provider] in
             for await state in provider.updates {
@@ -45,12 +49,15 @@ import SwiftUI
                 self?.provider.stop()
                 self?.systemMonitor.stop()
                 self?.model.clearActivity()
+                self?.model.clearScreenshotFeedback()
+                self?.screenshotMonitor.stop()
             }
         })
         observers.append(center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
                 self?.sleeping = false
                 if self?.model.enabled == true { self?.systemMonitor.start() }
+                self?.screenshotMonitor.start()
                 self?.model.receive(.idle)
                 self?.provider.start()
             }
@@ -60,7 +67,9 @@ import SwiftUI
 
     func stop() {
         systemMonitor.stop()
+        screenshotMonitor.stop()
         model.clearActivity()
+        model.clearScreenshotFeedback()
         provider.stop()
         updates?.cancel()
         observers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
@@ -88,6 +97,11 @@ import SwiftUI
 
     func showPocket() {
         pocketWindow?.show()
+    }
+
+    func showScreenshot(_ image: NSImage) {
+        screenshot = image
+        model.showScreenshotCopied()
     }
 
     private static func decodeArtwork(_ data: Data?) async -> NSImage? {

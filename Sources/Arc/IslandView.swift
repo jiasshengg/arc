@@ -18,6 +18,9 @@ struct IslandView: View {
             return IslandLayout.pocketSize(expanded: model.expanded, count: model.pocket.islandItems.count,
                                            receiving: model.receivingFiles, notch: model.notchSize)
         }
+        if model.screenshotCopied {
+            return IslandLayout.activitySize(expanded: model.expanded, notch: model.notchSize)
+        }
         if model.activity != nil {
             return IslandLayout.activitySize(expanded: model.expanded, notch: model.notchSize)
         }
@@ -56,6 +59,16 @@ struct IslandView: View {
                     }.frame(width: size.width, height: size.height)
                     .accessibilityLabel("Pocket, \(model.pocket.items.count) held items")
                 }
+            } else if model.screenshotCopied {
+                if model.expanded {
+                    screenshotView
+                        .padding(.top, model.notchSize.height)
+                        .transition(activityTransition)
+                } else {
+                    compactScreenshotView
+                        .frame(width: size.width, height: size.height)
+                        .transition(activityTransition)
+                }
             } else if let activity = model.activity {
                 if model.expanded {
                     activityView(activity)
@@ -81,6 +94,7 @@ struct IslandView: View {
             }
         }
         .animation(reduceMotion ? .easeOut(duration: 0.12) : .easeInOut(duration: 0.22), value: model.activity)
+        .animation(reduceMotion ? .easeOut(duration: 0.12) : .easeInOut(duration: 0.22), value: model.screenshotCopied)
         .frame(width: size.width, height: size.height, alignment: .top)
         .background(.black, in: outline)
         .foregroundStyle(.white)
@@ -95,6 +109,61 @@ struct IslandView: View {
         .accessibilityAction(named: "Expand island") { model.hover(true) }
         .accessibilityAction(named: "Collapse island") { model.collapse() }
         .preferredColorScheme(.dark)
+    }
+
+    private var screenshotView: some View {
+        HStack(spacing: 12) {
+            screenshotThumbnail(size: 44)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Screenshot copied").font(.system(size: 13, weight: .semibold))
+                Text("Ready to paste").font(.system(size: 11)).foregroundStyle(.white.opacity(0.55))
+            }
+            Spacer()
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 18))
+                .foregroundStyle(chargingGreen)
+        }
+        .padding(.horizontal, 20)
+        .frame(height: 64)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Screenshot copied, ready to paste")
+    }
+
+    private var compactScreenshotView: some View {
+        Group {
+            if attached {
+                HStack(spacing: 0) {
+                    screenshotThumbnail(size: 24).frame(width: 44)
+                    Color.clear.frame(width: model.notchSize.width)
+                    Image(systemName: "checkmark")
+                        .foregroundStyle(chargingGreen)
+                        .frame(width: 44)
+                }
+            } else {
+                HStack(spacing: 10) {
+                    screenshotThumbnail(size: 24)
+                    Text("Screenshot copied").font(.system(size: 11, weight: .medium))
+                    Spacer(minLength: 0)
+                    Image(systemName: "checkmark").foregroundStyle(chargingGreen)
+                }.padding(.horizontal, 10)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Screenshot copied")
+    }
+
+    private func screenshotThumbnail(size: CGFloat) -> some View {
+        Group {
+            if let screenshot = coordinator.screenshot {
+                Image(nsImage: screenshot).resizable().scaledToFill()
+            } else {
+                Image(systemName: "rectangle.dashed").font(.system(size: size * 0.55))
+            }
+        }
+        .frame(width: size, height: size)
+        .background(.white.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: size > 30 ? 8 : 5))
+        .accessibilityHidden(true)
     }
 
     private func activityView(_ activity: SystemActivity) -> some View {
