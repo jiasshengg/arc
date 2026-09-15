@@ -25,6 +25,7 @@ import SwiftUI
         #if DEBUG
         if PrototypeChecks.runIfRequested() { return }
         #endif
+        coordinator.menuPocketControlFrame = { [weak menuPocket] in menuPocket?.chevronFrame }
         coordinator.start()
         menuPocket.start()
     }

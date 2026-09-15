@@ -102,9 +102,10 @@ private final class IslandPanel: NSPanel {
         let shape = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
         // The attached shape has square top corners; the camera housing is reserved space.
         let squareTop = attached && CGRect(x: rect.minX, y: rect.maxY - radius, width: rect.width, height: radius).contains(point)
-        let nowInside = shape.contains(point) || squareTop
+        let overMenuControl = coordinator.menuPocketControlFrame?()?.contains(point) == true
+        let nowInside = !overMenuControl && (shape.contains(point) || squareTop)
         // Transparent rounded corners must not swallow clicks intended for the app below.
-        panel.ignoresMouseEvents = !nowInside && !coordinator.model.receivingFiles && !coordinator.model.draggingFileOut
+        panel.ignoresMouseEvents = overMenuControl || (!nowInside && !coordinator.model.receivingFiles && !coordinator.model.draggingFileOut)
         if nowInside != inside {
             inside = nowInside
             coordinator.model.hover(nowInside)

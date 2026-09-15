@@ -14,6 +14,7 @@ import SwiftUI
     @ObservationIgnored private var sleeping = false
     @ObservationIgnored private let provider: NowPlayingProviding
     @ObservationIgnored private var updates: Task<Void, Never>?
+    @ObservationIgnored var menuPocketControlFrame: (() -> CGRect?)?
     @ObservationIgnored private var window: IslandWindowController?
     @ObservationIgnored private var pocketWindow: PocketWindowController?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []

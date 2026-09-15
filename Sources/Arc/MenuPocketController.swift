@@ -31,6 +31,8 @@ import Combine
         super.init()
     }
 
+    var chevronFrame: CGRect? { chevron?.button?.window?.frame }
+
     func start() {
         NotificationCenter.default.addObserver(self, selector: #selector(screenParametersChanged),
                                                name: NSApplication.didChangeScreenParametersNotification,
