@@ -152,3 +152,52 @@ import Combine
         isExpanded = true
     }
 }
+
+#if DEBUG
+extension MenuPocketController {
+    /// Exercises native status-item layout and target/action without user preferences.
+    static func smokeCheck() async -> Bool {
+        let name = "Arc.MenuPocketCheck." + UUID().uuidString
+        guard let defaults = UserDefaults(suiteName: name) else { return false }
+        let controller = MenuPocketController(defaults: defaults, itemPrefix: name)
+        defer {
+            controller.stop()
+            defaults.removePersistentDomain(forName: name)
+        }
+        controller.setEnabled(true)
+        for _ in 0..<10 {
+            try? await Task.sleep(for: .milliseconds(200))
+            if let frame = controller.chevronFrame, frame.minY > 0 { break }
+        }
+        guard let button = controller.chevron?.button,
+              let control = controller.chevronFrame,
+              let divider = controller.spacer?.button?.window?.frame,
+              divider.maxX <= control.minX + 1,
+              divider.minY > 0, divider.width <= 1 else {
+            print("Menu Pocket initial layout failed:", controller.chevronFrame as Any,
+                  controller.spacer?.button?.window?.frame as Any)
+            return false
+        }
+        for _ in 0..<3 {
+            button.performClick(nil)
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !controller.isExpanded, (controller.spacer?.length ?? 0) >= 500 else {
+                print("Menu Pocket click did not collapse")
+                return false
+            }
+            button.performClick(nil)
+            try? await Task.sleep(for: .milliseconds(300))
+            guard controller.isExpanded,
+                  let frame = controller.spacer?.button?.window?.frame,
+                  frame.width <= 1, frame.minY > 0 else {
+                print("Menu Pocket click did not restore narrow boundary")
+                return false
+            }
+        }
+        controller.setEnabled(false)
+        guard controller.spacer == nil, controller.chevron == nil else { return false }
+        print("Menu Pocket native check passed: three click/reveal cycles, 1-point boundary, cleanup")
+        return true
+    }
+}
+#endif

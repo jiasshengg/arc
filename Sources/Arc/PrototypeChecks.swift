@@ -7,6 +7,10 @@ import SwiftUI
 @MainActor enum PrototypeChecks {
     static func runIfRequested() -> Bool {
         let args = ProcessInfo.processInfo.arguments
+        if args.contains("--menu-pocket-smoke-test") {
+            Task { exit(await MenuPocketController.smokeCheck() ? 0 : 1) }
+            return true
+        }
         if args.contains("--system-smoke-test") {
             Task {
                 let monitor = SystemActivityMonitor()

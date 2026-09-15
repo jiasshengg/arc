@@ -94,6 +94,8 @@ detect.
 swift test
 # Development build only: read real media for two seconds without changing playback.
 dist/Arc.app/Contents/MacOS/Arc --smoke-test
+# Exercise native Menu Pocket layout and button actions with temporary status items.
+dist/Arc.app/Contents/MacOS/Arc --menu-pocket-smoke-test
 # Render synthetic UI fixtures without screen capture permissions.
 dist/Arc.app/Contents/MacOS/Arc --render-previews "$PWD/.build/previews"
 ```
