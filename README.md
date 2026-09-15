@@ -44,6 +44,35 @@ Incoming drags take priority over music and battery feedback. Text, browser imag
 data, and promised files are not supported. Cross-app drag compatibility still
 needs hands-on validation.
 
+## Menu Pocket
+
+Enable **Menu Pocket** in Arc’s capsule menu. It adds a chevron, starting with
+everything revealed. Choose **Arrange Menu Pocket…** to temporarily show the
+divider for setup:
+
+1. Hold **Command** and drag ChatGPT, Teams, utilities, or media icons to the
+   **left of the divider**.
+2. Keep Arc’s capsule, battery, Wi-Fi, Search, and Control Centre **to the right**.
+   The divider must also remain **left of the chevron**.
+3. Click the chevron to finish arranging, remove the visible divider, and collapse
+   the section. Click again to reveal the real
+   icons inline, then again to hide them when finished.
+
+**Arrange Menu Pocket…** reveals the section, temporarily shows the divider,
+and explains setup. Normal use has no visible divider; a 1-point boundary retains
+the grouping without the standard status-item padding.
+Disabling Menu Pocket or quitting Arc restores the icons. The enabled preference
+and macOS-managed item positions are saved; launch and display changes reveal
+the section again. There is no automatic re-hide timer in this first version.
+
+Arc widens its own menu-bar spacer to push icons on its left out of view. Apps
+and their processes continue normally, with no new permissions. This groups
+icons by position, so newly launched apps may appear inside the hidden section.
+macOS still limits inline space, especially beside a notch; reduce the number
+of icons if they cannot all fit when revealed. Arc does not identify or move
+other apps’ icons automatically. Native arrangement, notch overflow, and
+multiple-display behavior still require hands-on validation.
+
 ## Screenshots
 
 Take a normal macOS screenshot with **Shift-Command-3** or

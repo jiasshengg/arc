@@ -8,12 +8,13 @@ import SwiftUI
 
     var body: some Scene {
         MenuBarExtra("Arc", systemImage: "capsule.lefthalf.filled") {
-            ArcMenu(coordinator: delegate.coordinator)
+            ArcMenu(coordinator: delegate.coordinator, menuPocket: delegate.menuPocket)
         }
     }
 }
 
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate {
+    let menuPocket = MenuPocketController()
     let coordinator = IslandCoordinator(
         provider: MediaRemoteProvider(),
         enabled: UserDefaults.standard.object(forKey: "showIsland") as? Bool ?? true
@@ -25,12 +26,17 @@ import SwiftUI
         if PrototypeChecks.runIfRequested() { return }
         #endif
         coordinator.start()
+        menuPocket.start()
     }
-    func applicationWillTerminate(_ notification: Notification) { coordinator.stop() }
+    func applicationWillTerminate(_ notification: Notification) {
+        menuPocket.stop()
+        coordinator.stop()
+    }
 }
 
 private struct ArcMenu: View {
     let coordinator: IslandCoordinator
+    @ObservedObject var menuPocket: MenuPocketController
     @AppStorage("showIsland") private var showIsland = true
     @State private var loginEnabled = SMAppService.mainApp.status == .enabled
     @State private var loginMessage: String?
@@ -59,6 +65,12 @@ private struct ArcMenu: View {
             Text("Battery: \(battery.percent)% · \(battery.charging ? "Charging" : (battery.pluggedIn ? "Plugged in" : "On battery"))")
             Divider()
         }
+        Toggle("Menu Pocket", isOn: Binding(get: { menuPocket.isEnabled }, set: menuPocket.setEnabled))
+        if menuPocket.isEnabled {
+            Button(menuPocket.isExpanded ? "Hide menu icons" : "Reveal menu icons") { menuPocket.toggle() }
+            Button("Arrange Menu Pocket…") { menuPocket.showSetup() }
+        }
+        Divider()
         Text("Pocket: \(coordinator.model.pocket.items.count) items")
         Button("Open Pocket…") { coordinator.showPocket() }
         Button("Clear") { coordinator.model.pocket.clear() }
