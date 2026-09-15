@@ -78,8 +78,18 @@ import ArcCore
     }
 
     func send(_ command: MediaCommand) {
+        runCommand(arguments: ["send", command.rawValue])
+    }
+
+    func seek(to position: TimeInterval) {
+        guard position.isFinite, position >= 0,
+              position <= Double(Int64.max) / 1_000_000 else { return }
+        runCommand(arguments: ["seek", String(Int64((position * 1_000_000).rounded()))])
+    }
+
+    private func runCommand(arguments: [String]) {
         guard listener?.isRunning == true, commands.count < 3,
-              let process = process(arguments: ["send", command.rawValue]) else { return }
+              let process = process(arguments: arguments) else { return }
         let id = UUID()
         process.standardOutput = FileHandle.nullDevice
         process.terminationHandler = { [weak self] process in

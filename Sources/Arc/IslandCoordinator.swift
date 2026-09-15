@@ -89,6 +89,22 @@ import SwiftUI
         provider.send(command)
     }
 
+    func seek(to position: TimeInterval) {
+        guard position.isFinite, let duration = model.media.snapshot?.duration else { return }
+        let clampedPosition = min(duration, max(0, position))
+        model.seek(to: clampedPosition)
+        provider.seek(to: clampedPosition)
+    }
+
+    func openMediaApp() {
+        guard let bundleIdentifier = model.media.snapshot?.sourceBundleIdentifier,
+              !bundleIdentifier.isEmpty,
+              let applicationURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else { return }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.openApplication(at: applicationURL, configuration: configuration) { _, _ in }
+    }
+
     func retry() {
         provider.stop()
         model.receive(.idle)

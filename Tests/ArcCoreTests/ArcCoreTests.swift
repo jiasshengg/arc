@@ -17,6 +17,15 @@ final class ArcCoreTests: XCTestCase {
         XCTAssertEqual(track.position(at: epoch.addingTimeInterval(60)), 30)
     }
 
+    func testSeekingClampsAndResetsObservationTime() {
+        let track = NowPlayingSnapshot(title: "Track", duration: 120, elapsed: 30,
+                                       observedAt: epoch, isPlaying: true)
+        let seekDate = epoch.addingTimeInterval(10)
+        XCTAssertEqual(track.seeking(to: 75, at: seekDate).position(at: seekDate), 75)
+        XCTAssertEqual(track.seeking(to: -5, at: seekDate).position(at: seekDate), 0)
+        XCTAssertEqual(track.seeking(to: 150, at: seekDate).position(at: seekDate), 120)
+    }
+
     func testMalformedNumbersAreNormalized() {
         for invalid in [Double.nan, .infinity, -.infinity, -1, 0] {
             let track = NowPlayingSnapshot(title: " ", duration: invalid, elapsed: invalid, observedAt: epoch, isPlaying: true, playbackRate: .nan)
@@ -84,7 +93,7 @@ final class ArcCoreTests: XCTestCase {
         let compact = IslandLayout.size(expanded: false, hasMedia: true, notch: notch)
         let expanded = IslandLayout.size(expanded: true, hasMedia: true, notch: notch)
         XCTAssertEqual(compact.width - notch.width, 88)
-        XCTAssertEqual(expanded.height - notch.height, 148)
+        XCTAssertEqual(expanded.height - notch.height, 164)
         let screen = CGRect(x: -1512, y: 200, width: 1512, height: 982)
         for size in [compact, expanded, IslandLayout.size(expanded: false, hasMedia: false, notch: notch)] {
             let frame = IslandLayout.frame(screen: screen, visible: screen.insetBy(dx: 0, dy: 32), safeTop: notch.height, size: size)

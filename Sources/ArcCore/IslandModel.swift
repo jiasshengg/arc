@@ -71,6 +71,10 @@ import Observation
     }
 
     public func receive(_ state: MediaState) { media = state }
+    public func seek(to position: TimeInterval, at date: Date = Date()) {
+        guard let snapshot = media.snapshot, snapshot.duration != nil else { return }
+        media = .media(snapshot.seeking(to: position, at: date))
+    }
     public func setEnabled(_ enabled: Bool) {
         self.enabled = enabled
         if !enabled { receivingFiles = false; collapse(); clearActivity(); clearScreenshotFeedback() }
@@ -102,10 +106,10 @@ public enum IslandLayout {
     public static func size(expanded: Bool, hasMedia: Bool, notch: CGSize = .zero) -> CGSize {
         if notch.height > 0 {
             return expanded
-                ? CGSize(width: max(380, notch.width + 88), height: notch.height + (hasMedia ? 148 : 100))
+                ? CGSize(width: max(380, notch.width + 88), height: notch.height + (hasMedia ? 164 : 100))
                 : CGSize(width: notch.width + (hasMedia ? 88 : 12), height: notch.height + 2)
         }
-        return expanded ? CGSize(width: 380, height: hasMedia ? 148 : 100)
+        return expanded ? CGSize(width: 380, height: hasMedia ? 164 : 100)
             : (hasMedia ? CGSize(width: 240, height: 40) : CGSize(width: 72, height: 12))
     }
 

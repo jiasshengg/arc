@@ -5,6 +5,7 @@ struct IslandView: View {
     let coordinator: IslandCoordinator
     var onSizeChange: (CGSize) -> Void = { _ in }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var draggedPosition: TimeInterval?
     private var model: IslandModel { coordinator.model }
     private let accent = Color.white
     private let chargingGreen = Color(red: 52 / 255, green: 199 / 255, blue: 89 / 255)
@@ -230,19 +231,28 @@ struct IslandView: View {
     @ViewBuilder private var compact: some View {
         if let track = model.media.snapshot {
             if attached {
-                HStack(spacing: 0) {
-                    artwork(size: min(24, model.notchSize.height - 6)).frame(width: 44)
-                    Color.clear.frame(width: model.notchSize.width)
-                    playbackIndicator(track.isPlaying).frame(width: 44)
+                Button(action: coordinator.openMediaApp) {
+                    HStack(spacing: 0) {
+                        artwork(size: min(24, model.notchSize.height - 6)).frame(width: 44)
+                        Color.clear.frame(width: model.notchSize.width)
+                        playbackIndicator(track.isPlaying).frame(width: 44)
+                    }
                 }
-                .accessibilityLabel(track.title)
+                .buttonStyle(.plain)
+                .help("Open media app")
+                .accessibilityLabel("Open \(track.title) in media app")
             } else {
-                HStack(spacing: 10) {
-                    artwork(size: 28)
-                    Text(track.title).font(.system(size: 12, weight: .medium)).lineLimit(1)
-                    Spacer(minLength: 0)
-                    playbackIndicator(track.isPlaying)
-                }.padding(.horizontal, 8)
+                Button(action: coordinator.openMediaApp) {
+                    HStack(spacing: 10) {
+                        artwork(size: 28)
+                        Text(track.title).font(.system(size: 12, weight: .medium)).lineLimit(1)
+                        Spacer(minLength: 0)
+                        playbackIndicator(track.isPlaying)
+                    }.padding(.horizontal, 8)
+                }
+                .buttonStyle(.plain)
+                .help("Open media app")
+                .accessibilityLabel("Open \(track.title) in media app")
             }
         } else if !attached {
             Capsule().fill(.white.opacity(0.25)).frame(width: 24, height: 3)
@@ -251,27 +261,27 @@ struct IslandView: View {
 
     private func expanded(_ track: NowPlayingSnapshot) -> some View {
         VStack(spacing: 8) {
-            HStack(spacing: 14) {
-                artwork(size: 56)
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(track.title).font(.system(size: 15, weight: .semibold)).lineLimit(1)
-                    Text(track.artist.isEmpty ? "Unknown artist" : track.artist)
-                        .font(.system(size: 12)).foregroundStyle(.white.opacity(0.55)).lineLimit(1)
+            Button(action: coordinator.openMediaApp) {
+                HStack(spacing: 14) {
+                    artwork(size: 56)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(track.title).font(.system(size: 15, weight: .semibold)).lineLimit(1)
+                        Text(track.artist.isEmpty ? "Unknown artist" : track.artist)
+                            .font(.system(size: 12)).foregroundStyle(.white.opacity(0.55)).lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                    playbackIndicator(track.isPlaying)
                 }
-                Spacer(minLength: 0)
-                playbackIndicator(track.isPlaying)
             }
+            .buttonStyle(.plain)
+            .contentShape(Rectangle())
+            .help("Open media app")
+            .accessibilityLabel("Open \(track.title) in media app")
             TimelineView(.animation(minimumInterval: 1, paused: !model.shouldTick)) { context in
                 VStack(spacing: 4) {
-                    GeometryReader { geometry in
-                        Capsule().fill(.white.opacity(0.16))
-                            .overlay(alignment: .leading) {
-                                Capsule().fill(accent.opacity(0.9))
-                                    .frame(width: geometry.size.width * track.progress(at: context.date))
-                            }
-                    }.frame(height: 3)
+                    progressSlider(track, at: context.date)
                     HStack {
-                        Text(time(track.position(at: context.date)))
+                        Text(time(draggedPosition ?? track.position(at: context.date)))
                         Spacer()
                         Text(track.duration.map(time) ?? "LIVE")
                     }
@@ -280,8 +290,15 @@ struct IslandView: View {
                 }
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Playback progress")
-                .accessibilityValue("\(time(track.position(at: context.date))) of \(track.duration.map(time) ?? "live media")")
+                .accessibilityValue("\(time(draggedPosition ?? track.position(at: context.date))) of \(track.duration.map(time) ?? "live media")")
+                .accessibilityAdjustableAction { direction in
+                    guard let duration = track.duration else { return }
+                    let current = draggedPosition ?? track.position(at: context.date)
+                    let adjustment: TimeInterval = direction == .increment ? 5 : -5
+                    coordinator.seek(to: min(duration, max(0, current + adjustment)))
+                }
             }
+            .padding(.top, 4)
             HStack(spacing: 18) {
                 control("backward.end.fill", label: "Previous track", command: .previous)
                 control(track.isPlaying ? "pause.fill" : "play.fill", label: track.isPlaying ? "Pause" : "Play", command: .togglePlayback, prominent: true)
@@ -290,6 +307,41 @@ struct IslandView: View {
         }
         .padding(.horizontal, 22)
         .padding(.vertical, 10)
+    }
+
+    @ViewBuilder private func progressSlider(_ track: NowPlayingSnapshot, at date: Date) -> some View {
+        if let duration = track.duration {
+            GeometryReader { geometry in
+                let position = draggedPosition ?? track.position(at: date)
+                let progress = min(1, max(0, position / duration))
+                ZStack(alignment: .leading) {
+                    Capsule().fill(.white.opacity(0.16)).frame(height: 3)
+                    Capsule().fill(accent.opacity(0.9))
+                        .frame(width: geometry.size.width * progress, height: 3)
+                    Circle().fill(accent)
+                        .frame(width: 7, height: 7)
+                        .position(x: min(geometry.size.width - 3.5, max(3.5, geometry.size.width * progress)),
+                                  y: geometry.size.height / 2)
+                }
+                .frame(maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            draggedPosition = duration * min(1, max(0, value.location.x / geometry.size.width))
+                        }
+                        .onEnded { value in
+                            let position = duration * min(1, max(0, value.location.x / geometry.size.width))
+                            coordinator.seek(to: position)
+                            draggedPosition = nil
+                        }
+                )
+            }
+            .frame(height: 15)
+            .help("Drag to seek")
+        } else {
+            Capsule().fill(.white.opacity(0.16)).frame(height: 3)
+        }
     }
 
     private var empty: some View {

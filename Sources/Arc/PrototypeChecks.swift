@@ -169,5 +169,6 @@ import SwiftUI
     func start() {}
     func stop() {}
     func send(_ command: MediaCommand) {}
+    func seek(to position: TimeInterval) {}
 }
 #endif
