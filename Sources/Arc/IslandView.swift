@@ -303,7 +303,9 @@ struct IslandView: View {
                 control("backward.end.fill", label: "Previous track", command: .previous)
                 control(track.isPlaying ? "pause.fill" : "play.fill", label: track.isPlaying ? "Pause" : "Play", command: .togglePlayback, prominent: true)
                 control("forward.end.fill", label: "Next track", command: .next)
-            }.frame(height: 36)
+            }
+            .frame(height: 36)
+            .offset(y: -4)
         }
         .padding(.horizontal, 22)
         .padding(.vertical, 10)
@@ -386,7 +388,7 @@ struct IslandView: View {
     private func control(_ symbol: String, label: String, command: MediaCommand, prominent: Bool = false) -> some View {
         Button { coordinator.send(command) } label: {
             Image(systemName: symbol)
-                .font(.system(size: prominent ? 18 : 14, weight: .semibold))
+                .font(.system(size: prominent ? 21 : 16, weight: .semibold))
                 .frame(width: 44, height: 44)
                 .contentShape(Circle())
         }
