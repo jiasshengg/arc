@@ -9,6 +9,20 @@ import Foundation
     private var knownURLs: Set<URL> = []
     private var scanTask: Task<Void, Never>?
     private var processingTasks: [URL: Task<Void, Never>] = [:]
+    private var latestCopied: (date: Date, path: String)?
+    private let loadImage: (URL) -> NSImage?
+    private let copyImage: (NSImage) -> Bool
+
+    init(loadImage: ((URL) -> NSImage?)? = nil, copyImage: ((NSImage) -> Bool)? = nil) {
+        self.loadImage = loadImage ?? { url in
+            Self.isScreenshot(url) ? NSImage(contentsOf: url) : nil
+        }
+        self.copyImage = copyImage ?? { image in
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            return pasteboard.writeObjects([image])
+        }
+    }
 
     func start() {
         guard source == nil, let directory = Self.captureDirectory() else { return }
@@ -35,6 +49,7 @@ import Foundation
         source?.cancel()
         source = nil
         knownURLs.removeAll()
+        latestCopied = nil
     }
 
     private func scheduleScan(_ directory: URL) {
@@ -59,13 +74,17 @@ import Foundation
         }
     }
 
-    private func process(_ url: URL) async {
+    func process(_ url: URL) async {
+        let createdAt = (try? url.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? Date()
+        let order = (createdAt, url.path)
         for attempt in 0..<6 {
             guard !Task.isCancelled else { return }
-            if Self.isScreenshot(url), let image = NSImage(contentsOf: url) {
-                let pasteboard = NSPasteboard.general
-                pasteboard.clearContents()
-                guard pasteboard.writeObjects([image]) else { return }
+            // Metadata can arrive out of order. Never replace a newer capture
+            // that has already reached the clipboard with an older one.
+            if let latestCopied, order <= latestCopied { return }
+            if let image = loadImage(url) {
+                guard copyImage(image) else { return }
+                latestCopied = order
                 onScreenshot?(image)
                 return
             }
