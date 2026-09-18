@@ -11,7 +11,6 @@ import SwiftUI
     private(set) var battery: BatteryReading?
     @ObservationIgnored private let systemMonitor = SystemActivityMonitor()
     @ObservationIgnored private let screenshotMonitor = ScreenshotMonitor()
-    @ObservationIgnored private var sleeping = false
     @ObservationIgnored private let provider: NowPlayingProviding
     @ObservationIgnored private var updates: Task<Void, Never>?
     @ObservationIgnored var menuPocketControlFrame: (() -> CGRect?)?
@@ -33,7 +32,7 @@ import SwiftUI
         systemMonitor.onBattery = { [weak self] reading in self?.battery = reading }
         screenshotMonitor.onScreenshot = { [weak self] image in self?.showScreenshot(image) }
         screenshotMonitor.start()
-        if model.enabled { systemMonitor.start() }
+        systemMonitor.start()
         updates = Task { [weak self, provider] in
             for await state in provider.updates {
                 guard let self, !Task.isCancelled else { break }
@@ -46,7 +45,6 @@ import SwiftUI
         let center = NSWorkspace.shared.notificationCenter
         observers.append(center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
-                self?.sleeping = true
                 self?.provider.stop()
                 self?.systemMonitor.stop()
                 self?.model.clearActivity()
@@ -56,8 +54,7 @@ import SwiftUI
         })
         observers.append(center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
-                self?.sleeping = false
-                if self?.model.enabled == true { self?.systemMonitor.start() }
+                self?.systemMonitor.start()
                 self?.screenshotMonitor.start()
                 self?.model.receive(.idle)
                 self?.provider.start()
@@ -81,8 +78,6 @@ import SwiftUI
 
     func setEnabled(_ enabled: Bool) {
         model.setEnabled(enabled)
-        if enabled && !sleeping { systemMonitor.start() }
-        else { systemMonitor.stop() }
     }
 
     func send(_ command: MediaCommand) {
