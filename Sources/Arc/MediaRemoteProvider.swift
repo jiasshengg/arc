@@ -9,14 +9,17 @@ import ArcCore
     private var reader: Task<Void, Never>?
     private var commands: [UUID: Process] = [:]
     private var generation = 0
+    private let processFactory: (([String]) -> Process?)?
 
-    init() {
+    init(processFactory: (([String]) -> Process?)? = nil) {
+        self.processFactory = processFactory
         let stream = AsyncStream<MediaState>.makeStream(bufferingPolicy: .bufferingNewest(1))
         updates = stream.stream
         continuation = stream.continuation
     }
 
     private func process(arguments: [String]) -> Process? {
+        if let processFactory { return processFactory(arguments) }
         guard let script = Bundle.main.url(forResource: "mediaremote-adapter", withExtension: "pl"),
               let frameworks = Bundle.main.privateFrameworksURL else { return nil }
         let framework = frameworks.appendingPathComponent("MediaRemoteAdapter.framework")
@@ -73,7 +76,10 @@ import ArcCore
         listener?.terminationHandler = nil
         if listener?.isRunning == true { listener?.terminate() }
         listener = nil
-        for command in commands.values where command.isRunning { command.terminate() }
+        for command in commands.values {
+            command.terminationHandler = nil
+            if command.isRunning { command.terminate() }
+        }
         commands.removeAll()
     }
 
@@ -91,12 +97,14 @@ import ArcCore
         guard listener?.isRunning == true, commands.count < 3,
               let process = process(arguments: arguments) else { return }
         let id = UUID()
+        let currentGeneration = generation
         process.standardOutput = FileHandle.nullDevice
         process.terminationHandler = { [weak self] process in
             let failed = process.terminationStatus != 0
             Task { @MainActor in
-                self?.commands[id] = nil
-                if failed { self?.continuation.yield(.unavailable) }
+                guard let self, self.generation == currentGeneration else { return }
+                self.commands[id] = nil
+                if failed { self.continuation.yield(.unavailable) }
             }
         }
         do {

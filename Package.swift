@@ -8,6 +8,7 @@ let package = Package(
     targets: [
         .target(name: "ArcCore"),
         .executableTarget(name: "Arc", dependencies: ["ArcCore"]),
-        .testTarget(name: "ArcCoreTests", dependencies: ["ArcCore"])
+        .testTarget(name: "ArcCoreTests", dependencies: ["ArcCore"]),
+        .testTarget(name: "ArcTests", dependencies: ["Arc"])
     ]
 )
