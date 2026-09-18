@@ -21,7 +21,7 @@ import Combine
             return true
         }
         image.isTemplate = true
-        image.accessibilityDescription = "Menu Pocket divider"
+        image.accessibilityDescription = "Menu Pocket Setup Line"
         return image
     }()
 
@@ -104,9 +104,9 @@ import Combine
             updateAppearance()
         }
         let alert = NSAlert()
-        alert.messageText = "Arrange your Menu Pocket"
-        alert.informativeText = "Hold Command and drag lower-priority icons to the LEFT of Arc’s vertical divider. Keep the divider to the LEFT of Arc’s chevron.\n\nKeep Arc’s capsule, battery, Wi-Fi, Search, and Control Centre to the RIGHT of the divider.\n\nClick the chevron when you’re done arranging to hide the divider and collapse the section. Click again to reveal the real icons. Click it again when you’re done; apps keep running normally. Menu Pocket starts revealed when Arc launches.\n\nIf revealed icons don’t fit beside the notch, reduce the number of menu-bar icons."
-        alert.addButton(withTitle: "Got it")
+        alert.messageText = "Arrange Menu Pocket"
+        alert.informativeText = "Hold Command and drag the icons you want to hide to the left of the vertical line. Keep the line to the left of Arc’s arrow.\n\nKeep Arc’s main icon, battery, Wi-Fi, Search, and Control Centre to the right of the line.\n\nClick the arrow when you’re done. The line and those icons will disappear. Click the arrow again to show the icons. Your apps keep running.\n\nIcons are shown again when Arc starts. If some icons still don’t fit beside the notch, you’ll need fewer icons in the menu bar."
+        alert.addButton(withTitle: "Got It")
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
     }
@@ -130,8 +130,8 @@ import Combine
         }
         spacer?.button?.window?.ignoresMouseEvents = !showsDivider
         spacer?.button?.toolTip = showsDivider
-            ? "Command-drag icons to the left of this divider to hide them in Menu Pocket." : nil
-        let title = isExpanded ? "Hide Menu Pocket" : "Reveal Menu Pocket"
+            ? "Hold Command and drag icons to the left of this line to hide them." : nil
+        let title = isExpanded ? "Hide Menu Pocket" : "Show Menu Pocket"
         chevron?.button?.image = NSImage(systemSymbolName: isExpanded ? "chevron.right" : "chevron.left",
                                        accessibilityDescription: title)
         chevron?.button?.toolTip = title

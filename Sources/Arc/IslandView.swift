@@ -44,7 +44,7 @@ struct IslandView: View {
                             VStack(spacing: 8) {
                                 Image(systemName: "tray.and.arrow.down").font(.system(size: 24))
                                 Text(model.dropMessage).font(.system(size: 13, weight: .medium))
-                                Text("Files and folders · References only").font(.system(size: 10)).foregroundStyle(.gray)
+                                Text("Your files stay where they are.").font(.system(size: 10)).foregroundStyle(.gray)
                             }.frame(height: 100)
                         } else { PocketView(model: model, onOpenPocket: coordinator.showPocket) }
                     }
@@ -106,9 +106,9 @@ struct IslandView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .ignoresSafeArea()
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Arc island")
-        .accessibilityAction(named: "Expand island") { model.hover(true) }
-        .accessibilityAction(named: "Collapse island") { model.collapse() }
+        .accessibilityLabel("Arc Island")
+        .accessibilityAction(named: "Expand Island") { model.hover(true) }
+        .accessibilityAction(named: "Minimize Island") { model.collapse() }
         .preferredColorScheme(.dark)
     }
 
@@ -116,8 +116,8 @@ struct IslandView: View {
         HStack(spacing: 12) {
             screenshotThumbnail(size: 44)
             VStack(alignment: .leading, spacing: 3) {
-                Text("Screenshot copied").font(.system(size: 13, weight: .semibold))
-                Text("Ready to paste").font(.system(size: 11)).foregroundStyle(.white.opacity(0.55))
+                Text("Screenshot Copied").font(.system(size: 13, weight: .semibold))
+                Text("Ready To Paste").font(.system(size: 11)).foregroundStyle(.white.opacity(0.55))
             }
             Spacer()
             Image(systemName: "checkmark.circle.fill")
@@ -127,7 +127,7 @@ struct IslandView: View {
         .padding(.horizontal, 20)
         .frame(height: 64)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Screenshot copied, ready to paste")
+        .accessibilityLabel("Screenshot Copied, ready to paste")
     }
 
     private var compactScreenshotView: some View {
@@ -143,14 +143,14 @@ struct IslandView: View {
             } else {
                 HStack(spacing: 10) {
                     screenshotThumbnail(size: 24)
-                    Text("Screenshot copied").font(.system(size: 11, weight: .medium))
+                    Text("Screenshot Copied").font(.system(size: 11, weight: .medium))
                     Spacer(minLength: 0)
                     Image(systemName: "checkmark").foregroundStyle(chargingGreen)
                 }.padding(.horizontal, 10)
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Screenshot copied")
+        .accessibilityLabel("Screenshot Copied")
     }
 
     private func screenshotThumbnail(size: CGFloat) -> some View {
@@ -239,8 +239,8 @@ struct IslandView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .help("Open media app")
-                .accessibilityLabel("Open \(track.title) in media app")
+                .help("Open Playing App")
+                .accessibilityLabel("Open \(track.title) In Playing App")
             } else {
                 Button(action: coordinator.openMediaApp) {
                     HStack(spacing: 10) {
@@ -251,8 +251,8 @@ struct IslandView: View {
                     }.padding(.horizontal, 8)
                 }
                 .buttonStyle(.plain)
-                .help("Open media app")
-                .accessibilityLabel("Open \(track.title) in media app")
+                .help("Open Playing App")
+                .accessibilityLabel("Open \(track.title) In Playing App")
             }
         } else if !attached {
             Capsule().fill(.white.opacity(0.25)).frame(width: 24, height: 3)
@@ -266,7 +266,7 @@ struct IslandView: View {
                     artwork(size: 56)
                     VStack(alignment: .leading, spacing: 5) {
                         Text(track.title).font(.system(size: 15, weight: .semibold)).lineLimit(1)
-                        Text(track.artist.isEmpty ? "Unknown artist" : track.artist)
+                        Text(track.artist.isEmpty ? "Unknown Artist" : track.artist)
                             .font(.system(size: 12)).foregroundStyle(.white.opacity(0.55)).lineLimit(1)
                     }
                     Spacer(minLength: 0)
@@ -275,8 +275,8 @@ struct IslandView: View {
             }
             .buttonStyle(.plain)
             .contentShape(Rectangle())
-            .help("Open media app")
-            .accessibilityLabel("Open \(track.title) in media app")
+            .help("Open Playing App")
+            .accessibilityLabel("Open \(track.title) In Playing App")
             TimelineView(.animation(minimumInterval: 1, paused: !model.shouldTick)) { context in
                 VStack(spacing: 4) {
                     progressSlider(track, at: context.date)
@@ -289,7 +289,7 @@ struct IslandView: View {
                     .foregroundStyle(.white.opacity(0.4))
                 }
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Playback progress")
+                .accessibilityLabel("Song Position")
                 .accessibilityValue("\(time(draggedPosition ?? track.position(at: context.date))) of \(track.duration.map(time) ?? "live media")")
                 .accessibilityAdjustableAction { direction in
                     guard let duration = track.duration else { return }
@@ -340,7 +340,7 @@ struct IslandView: View {
                 )
             }
             .frame(height: 15)
-            .help("Drag to seek")
+            .help("Drag To Skip Ahead Or Back")
         } else {
             Capsule().fill(.white.opacity(0.16)).frame(height: 3)
         }
@@ -351,9 +351,9 @@ struct IslandView: View {
             Image(systemName: model.media == .unavailable ? "antenna.radiowaves.left.and.right.slash" : "music.note")
                 .font(.system(size: 24)).foregroundStyle(accent)
             VStack(alignment: .leading, spacing: 5) {
-                Text(model.media == .unavailable ? "Media connection unavailable" : "A little space for your music.")
+                Text(model.media == .unavailable ? "Can’t Connect To Your Music" : "Your Music, Close By")
                     .font(.system(size: 13, weight: .semibold))
-                Text(model.media == .unavailable ? "Retry from Arc in the menu bar." : "Play something to get started.")
+                Text(model.media == .unavailable ? "Choose Try Connecting Again in Arc’s menu." : "Play something to get started.")
                     .font(.system(size: 11)).foregroundStyle(.white.opacity(0.5))
             }
         }.padding(20)

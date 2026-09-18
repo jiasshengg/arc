@@ -21,8 +21,8 @@ final class PocketHostingView: NSHostingView<IslandView> {
         let accepted = !additions.isEmpty
         let overflow = max(0, model.pocket.items.count + additions.count - Pocket.islandCapacity)
         model.dropMessage = accepted
-            ? (overflow > 0 ? "Drop to hold · \(overflow) more in Pocket" : "Drop to hold")
-            : "Already held or unavailable"
+            ? (overflow > 0 ? "Drop To Add · \(overflow) more in Pocket" : "Drop To Add")
+            : "Already Added Or Missing"
         model.setReceivingFiles(true)
         return accepted ? .copy : []
     }
@@ -92,7 +92,7 @@ struct PocketItemRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.url.lastPathComponent).font(.system(size: 12, weight: .medium)).lineLimit(1)
                     if item.isMissing {
-                        Text("Original moved or deleted").font(.system(size: 10)).foregroundStyle(.orange)
+                        Text("File Moved Or Deleted").font(.system(size: 10)).foregroundStyle(.orange)
                     } else if showsPath {
                         Text(displayPath)
                             .font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
@@ -103,10 +103,10 @@ struct PocketItemRow: View {
                     .font(.system(size: 10)).foregroundStyle(item.isMissing ? .orange : .secondary)
             }
             .overlay { PocketDragHandle(url: item.url, model: model) }
-            .help(item.isMissing ? "Original moved or deleted: \(item.url.path)" : "Drag into another app · \(item.url.path)")
+            .help(item.isMissing ? "File Moved Or Deleted: \(item.url.path)" : "Drag Into Another App · \(item.url.path)")
             Button { model.pocket.remove(item.url) } label: {
                 Image(systemName: "xmark").font(.system(size: 10)).frame(width: 28, height: 30)
-            }.buttonStyle(.plain).accessibilityLabel("Remove \(item.url.lastPathComponent) from Pocket")
+            }.buttonStyle(.plain).accessibilityLabel("Remove \(item.url.lastPathComponent) From Pocket")
         }
         .frame(height: showsPath ? 48 : 40)
     }

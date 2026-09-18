@@ -43,32 +43,32 @@ private struct ArcMenu: View {
     @State private var loginMessage: String?
 
     var body: some View {
-        Text("Arc · Music, within reach")
+        Text("Arc · Music Within Reach")
         Divider()
-        Toggle("Show island", isOn: $showIsland)
+        Toggle("Show Island", isOn: $showIsland)
             .onChange(of: showIsland) { _, enabled in coordinator.setEnabled(enabled) }
-        Toggle("Launch at login", isOn: Binding(get: { loginEnabled }, set: setLogin))
+        Toggle("Launch At Login", isOn: Binding(get: { loginEnabled }, set: setLogin))
         if let loginMessage { Text(loginMessage) }
         if SMAppService.mainApp.status == .requiresApproval {
-            Button("Allow Arc in Login Items…") { SMAppService.openSystemSettingsLoginItems() }
+            Button("Allow Arc In Login Items…") { SMAppService.openSystemSettingsLoginItems() }
         }
         Divider()
         if coordinator.model.media == .unavailable {
-            Text("Media integration unavailable")
-            Button("Retry media connection") { coordinator.retry() }
+            Text("Can’t Connect To Your Music")
+            Button("Try Connecting Again") { coordinator.retry() }
         } else if let track = coordinator.model.media.snapshot {
             Text(track.isPlaying ? "Playing: \(track.title)" : "Paused: \(track.title)")
             Button(track.isPlaying ? "Pause" : "Play") { coordinator.send(.togglePlayback) }
-            Button("Next track") { coordinator.send(.next) }
-        } else { Text("No media playing") }
+            Button("Next Track") { coordinator.send(.next) }
+        } else { Text("Nothing Playing") }
         Divider()
         if let battery = coordinator.battery {
-            Text("Battery: \(battery.percent)% · \(battery.charging ? "Charging" : (battery.pluggedIn ? "Plugged in" : "On battery"))")
+            Text("Battery: \(battery.percent)% · \(battery.charging ? "Charging" : (battery.pluggedIn ? "Plugged In" : "On Battery"))")
             Divider()
         }
         Toggle("Menu Pocket", isOn: Binding(get: { menuPocket.isEnabled }, set: menuPocket.setEnabled))
         if menuPocket.isEnabled {
-            Button(menuPocket.isExpanded ? "Hide menu icons" : "Reveal menu icons") { menuPocket.toggle() }
+            Button(menuPocket.isExpanded ? "Hide Menu Icons" : "Show Menu Icons") { menuPocket.toggle() }
             Button("Arrange Menu Pocket…") { menuPocket.showSetup() }
         }
         Divider()
@@ -85,10 +85,10 @@ private struct ArcMenu: View {
             if enabled { try SMAppService.mainApp.register() }
             else { try SMAppService.mainApp.unregister() }
             loginEnabled = SMAppService.mainApp.status == .enabled
-            loginMessage = SMAppService.mainApp.status == .requiresApproval ? "Approval needed in System Settings" : nil
+            loginMessage = SMAppService.mainApp.status == .requiresApproval ? "Allow Arc in System Settings to start it when you log in." : nil
         } catch {
             loginEnabled = SMAppService.mainApp.status == .enabled
-            loginMessage = "Couldn’t update login item: \(error.localizedDescription)"
+            loginMessage = "Couldn’t change Launch At Login: \(error.localizedDescription)"
         }
     }
 }

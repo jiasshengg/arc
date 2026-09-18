@@ -43,7 +43,7 @@ struct PocketWindowView: View {
 
             if model.pocket.items.isEmpty {
                 ContentUnavailableView(
-                    "Pocket is empty",
+                    "Pocket Is Empty",
                     systemImage: "tray",
                     description: Text("Drop files or folders above to keep them nearby.")
                 )
@@ -58,7 +58,7 @@ struct PocketWindowView: View {
                                 Divider().padding(.leading, 54)
                             }
                         } header: {
-                            sectionHeader("IN THE ISLAND", detail: "\(model.pocket.islandItems.count) of \(Pocket.islandCapacity)")
+                            sectionHeader("In The Island", detail: "\(model.pocket.islandItems.count) of \(Pocket.islandCapacity)")
                         }
 
                         if model.pocket.hasOverflow {
@@ -69,7 +69,7 @@ struct PocketWindowView: View {
                                     Divider().padding(.leading, 54)
                                 }
                             } header: {
-                                sectionHeader("MORE IN POCKET", detail: "Not shown in island")
+                                sectionHeader("More In Pocket", detail: "Not Shown In Island")
                             }
                         }
                     }
@@ -78,7 +78,7 @@ struct PocketWindowView: View {
 
             Divider()
             HStack {
-                Text("Temporary · Originals stay in place · Clears when Arc quits")
+                Text("Your files stay in place. Pocket clears when Arc quits.")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
                 Spacer()
                 Button("Clear") { model.pocket.clear() }
@@ -103,7 +103,7 @@ struct PocketWindowView: View {
     private var dropZone: some View {
         HStack(spacing: 9) {
             Image(systemName: "tray.and.arrow.down")
-            Text(receivingDrop ? "Drop to hold" : "Drop files and folders to hold them")
+            Text(receivingDrop ? "Drop To Add" : "Drop Files And Folders Here")
                 .font(.system(size: 12, weight: .medium))
         }
         .foregroundStyle(receivingDrop ? .primary : .secondary)

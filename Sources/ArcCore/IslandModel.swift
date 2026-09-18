@@ -5,7 +5,7 @@ import Observation
 @MainActor @Observable public final class IslandModel {
     public let pocket = Pocket()
     public private(set) var receivingFiles = false
-    public var dropMessage = "Drop to hold"
+    public var dropMessage = "Drop To Add"
     public var draggingFileOut = false {
         didSet { if draggingFileOut { hoverTask?.cancel() } }
     }
