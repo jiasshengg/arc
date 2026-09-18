@@ -11,6 +11,8 @@ import Combine
     private let defaults: UserDefaults
     private let itemPrefix: String
     private var spacerPadding: NSLayoutConstraint?
+    private var spacerWidth: NSLayoutConstraint?
+    private var screenFrames: [CGRect] = []
     private let expandedLength: CGFloat = 0
     private var isArranging = false
     private let dividerImage: NSImage = {
@@ -34,6 +36,7 @@ import Combine
     var chevronFrame: CGRect? { chevron?.button?.window?.frame }
 
     func start() {
+        screenFrames = NSScreen.screens.map(\.frame)
         NotificationCenter.default.addObserver(self, selector: #selector(screenParametersChanged),
                                                name: NSApplication.didChangeScreenParametersNotification,
                                                object: nil)
@@ -74,6 +77,10 @@ import Combine
                     && $0.secondAttribute == .width && $0.relation == .equal
                     && $0.constant > 0
             }
+            // Hold the revealed width with our own constraint. An imperative
+            // resize is discarded whenever AppKit re-lays the item out, such as
+            // when the menu bar moves to a display with different geometry.
+            spacerWidth = content.widthAnchor.constraint(equalToConstant: 1)
         }
 
         // Start revealed so newly added icons and changed arrangements are visible.
@@ -112,22 +119,33 @@ import Combine
     }
 
     @objc private func screenParametersChanged() {
-        // Reopen after a display change so a new layout cannot strand the control.
-        isArranging = false
-        isExpanded = true
+        // Display sleep, wake, and resolution changes post this notification too,
+        // so react only to an actual arrangement change and keep the current state.
+        let frames = NSScreen.screens.map(\.frame)
+        guard frames != screenFrames else { return }
+        screenFrames = frames
+        // A new arrangement can strand the control off-screen; reveal only then.
+        if !isExpanded && !isControlReachable {
+            isArranging = false
+            isExpanded = true
+        }
         updateAppearance()
+    }
+
+    private var isControlReachable: Bool {
+        guard let frame = chevron?.button?.window?.frame else { return false }
+        return NSScreen.screens.contains { $0.frame.intersects(frame) }
     }
 
     private func updateAppearance() {
         let widestScreen = NSScreen.screens.map(\.frame.width).max() ?? 1000
         let showsDivider = isExpanded && isArranging
-        spacerPadding?.isActive = !isExpanded || showsDivider
+        // Keep a measurable boundary without the standard 16-point padding.
+        let narrow = isExpanded && !showsDivider
+        spacerPadding?.isActive = !narrow
+        spacerWidth?.isActive = narrow
         spacer?.length = isExpanded ? (showsDivider ? 8 : expandedLength) : min(10_000, max(500, widestScreen * 2))
         spacer?.button?.image = showsDivider ? dividerImage : nil
-        if isExpanded && !showsDivider, let window = spacer?.button?.window {
-            // Keep a measurable boundary without the standard 16-point padding.
-            window.setContentSize(NSSize(width: 1, height: window.frame.height))
-        }
         spacer?.button?.window?.ignoresMouseEvents = !showsDivider
         spacer?.button?.toolTip = showsDivider
             ? "Hold Command and drag icons to the left of this line to hide them." : nil
@@ -145,6 +163,8 @@ import Combine
             NSStatusBar.system.removeStatusItem(spacer)
         }
         if let chevron { NSStatusBar.system.removeStatusItem(chevron) }
+        spacerWidth?.isActive = false
+        spacerWidth = nil
         spacerPadding = nil
         spacer = nil
         chevron = nil
@@ -164,6 +184,8 @@ extension MenuPocketController {
             controller.stop()
             defaults.removePersistentDomain(forName: name)
         }
+        // start() registers the screen-parameters observer the checks below exercise.
+        controller.start()
         controller.setEnabled(true)
         for _ in 0..<10 {
             try? await Task.sleep(for: .milliseconds(200))
@@ -183,6 +205,15 @@ extension MenuPocketController {
             try? await Task.sleep(for: .milliseconds(300))
             guard !controller.isExpanded, (controller.spacer?.length ?? 0) >= 500 else {
                 print("Menu Pocket click did not collapse")
+                return false
+            }
+            // Display sleep and wake post this with an unchanged arrangement; it
+            // must not reveal the section behind the user's back.
+            NotificationCenter.default.post(name: NSApplication.didChangeScreenParametersNotification,
+                                            object: NSApp)
+            try? await Task.sleep(for: .milliseconds(200))
+            guard !controller.isExpanded else {
+                print("Menu Pocket reopened on an unchanged screen arrangement")
                 return false
             }
             button.performClick(nil)
