@@ -58,6 +58,8 @@ import Observation
     }
     public private(set) var notchSize: CGSize = .zero
     public func setNotchSize(_ size: CGSize) { notchSize = size }
+    public var displayIsMirrored = false
+    public var attachesToTop: Bool { notchSize.height > 0 || displayIsMirrored }
     public private(set) var enabled: Bool
     @ObservationIgnored private var hoverTask: Task<Void, Never>?
     @ObservationIgnored private let enterDelay: UInt64
@@ -124,8 +126,8 @@ public enum IslandLayout {
         return CGSize(width: max(280, notch.width + 88), height: notch.height + 64)
     }
 
-    public static func frame(screen: CGRect, visible: CGRect, safeTop: CGFloat, size: CGSize) -> CGRect {
-        let top = safeTop > 0 ? screen.maxY : visible.maxY - 8
+    public static func frame(screen: CGRect, visible: CGRect, safeTop: CGFloat, size: CGSize, mirrored: Bool = false) -> CGRect {
+        let top = safeTop > 0 || mirrored ? screen.maxY : visible.maxY - 8
         let width = min(size.width, screen.width)
         return CGRect(x: screen.midX - width / 2, y: top - size.height, width: width, height: size.height)
     }

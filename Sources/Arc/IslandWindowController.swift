@@ -81,11 +81,14 @@ private final class IslandPanel: NSPanel {
         let notch = IslandLayout.notchSize(safeTop: screen.safeAreaInsets.top,
                                           leftArea: screen.auxiliaryTopLeftArea, rightArea: screen.auxiliaryTopRightArea)
         coordinator.model.setNotchSize(notch)
+        let displayID = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
+        let mirrored = displayID.map { CGDisplayIsInMirrorSet($0) != 0 } ?? false
+        coordinator.model.displayIsMirrored = mirrored
         // A stationary canvas avoids competing AppKit and SwiftUI layout animations.
         var canvas = IslandLayout.pocketSize(expanded: true, count: Pocket.islandCapacity, receiving: false, notch: notch)
         canvas.width += 24
         canvas.height += 16
-        let frame = IslandLayout.frame(screen: screen.frame, visible: screen.visibleFrame, safeTop: notch.height, size: canvas)
+        let frame = IslandLayout.frame(screen: screen.frame, visible: screen.visibleFrame, safeTop: notch.height, size: canvas, mirrored: mirrored)
         if panel.frame != frame { panel.setFrame(frame, display: true) }
         panel.orderFrontRegardless()
         trackPointer()
@@ -94,7 +97,7 @@ private final class IslandPanel: NSPanel {
     private func trackPointer() {
         guard coordinator.model.enabled else { return }
         let point = NSEvent.mouseLocation
-        let attached = coordinator.model.notchSize.height > 0
+        let attached = coordinator.model.attachesToTop
         let rect = CGRect(x: panel.frame.midX - visibleSize.width / 2,
                           y: panel.frame.maxY - visibleSize.height,
                           width: visibleSize.width, height: visibleSize.height)

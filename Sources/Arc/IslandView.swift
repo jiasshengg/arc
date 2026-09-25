@@ -29,10 +29,10 @@ struct IslandView: View {
     }
     private var outline: UnevenRoundedRectangle {
         UnevenRoundedRectangle(
-            topLeadingRadius: attached ? 0 : (model.expanded ? 24 : 20),
-            bottomLeadingRadius: model.expanded ? 24 : (attached ? 12 : 20),
-            bottomTrailingRadius: model.expanded ? 24 : (attached ? 12 : 20),
-            topTrailingRadius: attached ? 0 : (model.expanded ? 24 : 20), style: .continuous)
+            topLeadingRadius: model.attachesToTop ? 0 : (model.expanded ? 24 : 20),
+            bottomLeadingRadius: model.expanded ? 24 : (model.attachesToTop ? 12 : 20),
+            bottomTrailingRadius: model.expanded ? 24 : (model.attachesToTop ? 12 : 20),
+            topTrailingRadius: model.attachesToTop ? 0 : (model.expanded ? 24 : 20), style: .continuous)
     }
 
     var body: some View {
@@ -100,7 +100,7 @@ struct IslandView: View {
         .background(.black, in: outline)
         .foregroundStyle(.white)
         .clipShape(outline)
-        .overlay { outline.strokeBorder(.white.opacity(attached ? 0 : 0.10), lineWidth: 0.5) }
+        .overlay { outline.strokeBorder(.white.opacity(model.attachesToTop ? 0 : 0.10), lineWidth: 0.5) }
         .onGeometryChange(for: CGSize.self) { $0.size } action: { onSizeChange($0) }
         .animation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: model.expanded ? 0.42 : 0.28, dampingFraction: 0.88), value: size)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
