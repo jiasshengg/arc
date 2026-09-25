@@ -65,6 +65,8 @@ import SwiftUI
                         ("idle-expanded", .idle, true),
                         ("playing-compact", .media(track()), false),
                         ("playing-expanded", .media(track()), true),
+                        ("mirrored-compact", .media(track()), false),
+                        ("mirrored-expanded", .media(track()), true),
                         ("paused-expanded", .media(track(playing: false)), true),
                         ("long-title", .media(track(title: "A very long song title that should truncate gracefully without displacing playback controls")), true),
                         ("unavailable", .unavailable, true),
@@ -91,6 +93,7 @@ import SwiftUI
                         let coordinator = IslandCoordinator(provider: FixtureProvider(), enabled: true)
                         let notch = name.hasPrefix("notch-") ? CGSize(width: 192, height: 32) : .zero
                         coordinator.model.setNotchSize(notch)
+                        coordinator.model.displayIsMirrored = name.hasPrefix("mirrored-")
                         coordinator.model.receive(state)
                         if expanded {
                             coordinator.model.hover(true)

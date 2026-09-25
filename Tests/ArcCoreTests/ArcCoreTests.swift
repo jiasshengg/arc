@@ -75,6 +75,19 @@ final class ArcCoreTests: XCTestCase {
         XCTAssertEqual(moved.maxY, external.maxY - 8)
     }
 
+    func testMirroredNotchlessDisplayAttachesToTop() {
+        let screen = CGRect(x: -2560, y: 200, width: 2560, height: 1080)
+        let visible = CGRect(x: -2560, y: 260, width: 2560, height: 996)
+        for expanded in [false, true] {
+            let size = IslandLayout.size(expanded: expanded, hasMedia: true)
+            let mirrored = IslandLayout.frame(screen: screen, visible: visible, safeTop: 0, size: size, mirrored: true)
+            XCTAssertEqual(mirrored.maxY, screen.maxY)
+            XCTAssertEqual(mirrored.midX, screen.midX)
+            let unmirrored = IslandLayout.frame(screen: screen, visible: visible, safeTop: 0, size: size, mirrored: false)
+            XCTAssertEqual(unmirrored.maxY, visible.maxY - 8)
+        }
+    }
+
     func testExpansionKeepsTopCenterFixed() {
         let screen = CGRect(x: 0, y: 0, width: 1920, height: 1080)
         let compact = IslandLayout.frame(screen: screen, visible: screen, safeTop: 0, size: IslandLayout.size(expanded: false, hasMedia: true))
