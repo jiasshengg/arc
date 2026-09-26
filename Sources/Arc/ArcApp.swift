@@ -7,10 +7,30 @@ import SwiftUI
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     var body: some Scene {
-        MenuBarExtra("Arc", systemImage: "capsule.lefthalf.filled") {
+        MenuBarExtra {
             ArcMenu(coordinator: delegate.coordinator, menuPocket: delegate.menuPocket)
+        } label: {
+            Image(nsImage: Self.menuBarIcon)
+                .accessibilityLabel("Arc")
         }
     }
+
+    private static let menuBarIcon: NSImage = {
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
+            let orbit = NSBezierPath()
+            orbit.appendArc(withCenter: NSPoint(x: 9, y: 9), radius: 6.2,
+                            startAngle: 65, endAngle: 355, clockwise: false)
+            orbit.lineWidth = 1.8
+            orbit.lineCapStyle = .round
+            NSColor.black.setStroke()
+            orbit.stroke()
+            NSColor.black.setFill()
+            NSBezierPath(ovalIn: NSRect(x: 12.8, y: 11.3, width: 3.2, height: 3.2)).fill()
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }()
 }
 
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate {
