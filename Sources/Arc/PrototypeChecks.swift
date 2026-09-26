@@ -7,6 +7,29 @@ import SwiftUI
 @MainActor enum PrototypeChecks {
     static func runIfRequested() -> Bool {
         let args = ProcessInfo.processInfo.arguments
+        if args.contains("--performance-check") {
+            Task {
+                let coordinator = IslandCoordinator(provider: FixtureProvider(), enabled: true)
+                let window = IslandWindowController(coordinator: coordinator)
+                for scenario in ["compact-playing", "expanded-playing", "paused", "hidden", "low-power", "display-asleep"] {
+                    coordinator.model.receive(.media(track(playing: scenario != "paused")))
+                    coordinator.setEnabled(scenario != "hidden")
+                    coordinator.model.lowPowerMode = scenario == "low-power"
+                    coordinator.model.displayAwake = scenario != "display-asleep"
+                    if scenario == "expanded-playing" { coordinator.model.hover(true) }
+                    else { coordinator.model.collapse() }
+                    try? await Task.sleep(for: .seconds(1))
+                    let started = Date()
+                    let cpu = clock()
+                    try? await Task.sleep(for: .seconds(8))
+                    let percent = Double(clock() - cpu) / Double(CLOCKS_PER_SEC) / Date().timeIntervalSince(started) * 100
+                    print("\(scenario): \(String(format: "%.2f", percent))% CPU (one core)")
+                }
+                window.close()
+                exit(0)
+            }
+            return true
+        }
         if args.contains("--menu-pocket-smoke-test") {
             Task { exit(await MenuPocketController.smokeCheck() ? 0 : 1) }
             return true

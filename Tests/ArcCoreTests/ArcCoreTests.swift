@@ -5,6 +5,36 @@ import CoreGraphics
 final class ArcCoreTests: XCTestCase {
     let epoch = Date(timeIntervalSince1970: 100)
 
+    @MainActor func testVisualWorkStopsWhenHiddenSleepingOrCovered() async throws {
+        let model = IslandModel(enterDelay: 0)
+        model.receive(.media(NowPlayingSnapshot(title: "Track", isPlaying: true)))
+        XCTAssertTrue(model.shouldAnimatePlayback)
+        XCTAssertFalse(model.shouldTick)
+        model.hover(true)
+        try await Task.sleep(for: .milliseconds(20))
+        XCTAssertTrue(model.shouldTick)
+        model.displayAwake = false
+        XCTAssertFalse(model.shouldTick)
+        XCTAssertFalse(model.shouldAnimatePlayback)
+        model.displayAwake = true
+        model.lowPowerMode = true
+        XCTAssertTrue(model.shouldTick)
+        XCTAssertFalse(model.shouldAnimatePlayback)
+        model.lowPowerMode = false
+        XCTAssertTrue(model.shouldAnimatePlayback)
+        model.showScreenshotCopied()
+        XCTAssertFalse(model.shouldTick)
+        XCTAssertFalse(model.shouldAnimatePlayback)
+        model.clearScreenshotFeedback()
+        XCTAssertTrue(model.shouldAnimatePlayback)
+        model.setEnabled(false)
+        XCTAssertFalse(model.shouldAnimatePlayback)
+        XCTAssertFalse(model.shouldTick)
+        model.setEnabled(true)
+        model.receive(.media(NowPlayingSnapshot(title: "Paused", isPlaying: false)))
+        XCTAssertFalse(model.shouldAnimatePlayback)
+    }
+
     func testProgressExtrapolatesAndClamps() {
         let track = NowPlayingSnapshot(title: "Track", duration: 120, elapsed: 30, observedAt: epoch, isPlaying: true, playbackRate: 2)
         XCTAssertEqual(track.position(at: epoch.addingTimeInterval(10)), 50)
