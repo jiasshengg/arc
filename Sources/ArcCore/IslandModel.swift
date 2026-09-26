@@ -64,7 +64,12 @@ import Observation
     @ObservationIgnored private var hoverTask: Task<Void, Never>?
     @ObservationIgnored private let enterDelay: UInt64
     @ObservationIgnored private let exitDelay: UInt64
-    public var shouldTick: Bool { enabled && expanded && !showsPocket && activity == nil && !screenshotCopied && media.snapshot?.isPlaying == true }
+    public var displayAwake = true
+    public var lowPowerMode = false
+    public var shouldAnimatePlayback: Bool {
+        enabled && displayAwake && !lowPowerMode && !showsPocket && activity == nil && !screenshotCopied && media.snapshot?.isPlaying == true
+    }
+    public var shouldTick: Bool { enabled && displayAwake && expanded && !showsPocket && activity == nil && !screenshotCopied && media.snapshot?.isPlaying == true }
 
     public init(enabled: Bool = true, enterDelay: UInt64 = 100_000_000, exitDelay: UInt64 = 100_000_000) {
         self.enabled = enabled

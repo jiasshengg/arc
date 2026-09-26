@@ -12,6 +12,8 @@ import SwiftUI
     @ObservationIgnored private let systemMonitor = SystemActivityMonitor()
     @ObservationIgnored private let screenshotMonitor = ScreenshotMonitor()
     @ObservationIgnored private let provider: NowPlayingProviding
+    @ObservationIgnored private var artworkData: Data?
+    @ObservationIgnored private var powerObserver: NSObjectProtocol?
     @ObservationIgnored private var updates: Task<Void, Never>?
     @ObservationIgnored var menuPocketControlFrame: (() -> CGRect?)?
     @ObservationIgnored private var window: IslandWindowController?
@@ -24,6 +26,10 @@ import SwiftUI
     }
 
     func start() {
+        model.lowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
+        powerObserver = NotificationCenter.default.addObserver(forName: .NSProcessInfoPowerStateDidChange, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.model.lowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled }
+        }
         window = IslandWindowController(coordinator: self)
         pocketWindow = PocketWindowController(model: model)
         systemMonitor.onActivity = { [weak self] activity in
@@ -36,10 +42,7 @@ import SwiftUI
         updates = Task { [weak self, provider] in
             for await state in provider.updates {
                 guard let self, !Task.isCancelled else { break }
-                let image = await Self.decodeArtwork(state.snapshot?.artworkData)
-                guard !Task.isCancelled else { break }
-                self.artwork = image
-                self.model.receive(state)
+                await self.receive(state)
             }
         }
         let center = NSWorkspace.shared.notificationCenter
@@ -60,7 +63,25 @@ import SwiftUI
                 self?.provider.start()
             }
         })
+        observers.append(center.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.model.displayAwake = false }
+        })
+        observers.append(center.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.model.displayAwake = true }
+        })
         provider.start()
+    }
+
+    func receive(_ state: MediaState) async {
+        let data = state.snapshot?.artworkData
+        if data != artworkData {
+            let image = await Self.decodeArtwork(data)
+            guard !Task.isCancelled else { return }
+            artworkData = data
+            artwork = image
+        }
+        guard !Task.isCancelled else { return }
+        model.receive(state)
     }
 
     func stop() {
@@ -70,6 +91,8 @@ import SwiftUI
         model.clearScreenshotFeedback()
         provider.stop()
         updates?.cancel()
+        if let powerObserver { NotificationCenter.default.removeObserver(powerObserver) }
+        powerObserver = nil
         observers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
         observers.removeAll()
         window?.close()

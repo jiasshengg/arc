@@ -58,8 +58,6 @@ private final class IslandPanel: NSPanel {
     private func observeModel() {
         guard !closed else { return }
         withObservationTracking {
-            _ = coordinator.model.expanded
-            _ = coordinator.model.media
             _ = coordinator.model.enabled
         } onChange: { [weak self] in
             Task { @MainActor in
@@ -95,7 +93,7 @@ private final class IslandPanel: NSPanel {
     }
 
     private func trackPointer() {
-        guard coordinator.model.enabled else { return }
+        guard coordinator.model.enabled, coordinator.model.displayAwake else { return }
         let point = NSEvent.mouseLocation
         let attached = coordinator.model.attachesToTop
         let rect = CGRect(x: panel.frame.midX - visibleSize.width / 2,

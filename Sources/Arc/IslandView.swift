@@ -374,15 +374,9 @@ struct IslandView: View {
     }
 
     private func playbackIndicator(_ playing: Bool) -> some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !playing || reduceMotion || !model.enabled)) { context in
-            HStack(alignment: .center, spacing: 2) {
-                ForEach(0..<4) { index in
-                    let phase = context.date.timeIntervalSinceReferenceDate * 5 + Double(index) * 1.7
-                    Capsule().fill(playing ? accent : .gray)
-                        .frame(width: 2, height: playing ? 5 + 11 * abs(sin(phase)) : 4)
-                }
-            }.frame(width: 16, height: 18)
-        }.accessibilityLabel(playing ? "Playing" : "Paused")
+        PlaybackIndicator(playing: playing, animating: model.shouldAnimatePlayback && !reduceMotion)
+            .frame(width: 16, height: 18)
+            .accessibilityLabel(playing ? "Playing" : "Paused")
     }
 
     private func control(_ symbol: String, label: String, command: MediaCommand, prominent: Bool = false) -> some View {
