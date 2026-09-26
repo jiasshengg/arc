@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-configuration="${1:-debug}"
+configuration="${1:-release}"
 if [[ "$configuration" != debug && "$configuration" != release ]]; then
   echo "Usage: $0 [debug|release]" >&2
   exit 1

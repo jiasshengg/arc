@@ -17,6 +17,9 @@ commands from the project folder:
 open dist/Arc.app
 ```
 
+The default build is optimized for everyday use. Use `./scripts/build-app.sh debug`
+when you need the development checks below.
+
 You don’t need Homebrew or extra Swift packages. Open `Package.swift` in Xcode
 to edit the app. Use the build script above to run the full app: `swift run`
 doesn’t include the helper Arc needs to connect to your music.
@@ -139,6 +142,9 @@ pause during sleep. Battery monitoring also pauses when the island is hidden.
 
 ```sh
 swift test
+./scripts/build-app.sh debug
+# Measure UI CPU usage with synthetic media (keep the pointer away from the island).
+dist/Arc.app/Contents/MacOS/Arc --performance-check
 # Check the music connection without changing playback.
 dist/Arc.app/Contents/MacOS/Arc --smoke-test
 # Test Menu Pocket’s buttons and layout with temporary menu bar items.
