@@ -51,7 +51,7 @@ final class PlaybackBarsView: NSView {
                     (5 + 11 * abs(sin(Double(step) / 60 * 2 * .pi + Double(index) * 1.7))) / 16
                 }
                 animation.duration = 2 * .pi / 5
-                animation.preferredFrameRateRange = CAFrameRateRange(minimum: 15, maximum: 30, preferred: 30)
+                animation.preferredFrameRateRange = CAFrameRateRange(minimum: 10, maximum: 15, preferred: 15)
                 animation.repeatCount = .infinity
                 bar.add(animation, forKey: "playback")
             }
