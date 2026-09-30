@@ -69,20 +69,26 @@ To choose which icons to hide:
 3. Keep Arc’s main icon, battery, Wi-Fi, Search, and Control Centre to the
    **right of the line**.
 4. Click the arrow. The line and the icons on its left disappear.
-5. Click the arrow again to show those icons in their usual place. Click again
-   to hide them when you’re done.
+5. Click the arrow again to open a scrollable row below the menu bar. Select an
+   item there to open its original menu bar control. Click the arrow or × to
+   close the row.
+
+The arrow points down when the row can be opened and up when it can be closed
+or the inline icons can be hidden.
 
 Your apps keep running while their icons are hidden. Arc doesn’t choose or move
 icons for you. Icons from newly opened apps may appear in the hidden group.
 
 The setup line only appears while you’re arranging icons. Arc remembers whether
-Menu Pocket is on, and macOS manages the icon positions. Icons are shown again
-when Arc starts or your display setup changes. Turning off Menu Pocket or
-quitting Arc also shows them again.
+Menu Pocket is on, and macOS manages the icon positions. The row needs
+Accessibility permission to find and open other apps’ menu bar controls. It
+uses each app’s icon and name to represent the control; these may differ from
+the tiny icon in the menu bar. Icons return to the menu bar when Arc starts or
+your display setup changes. Turning off Menu Pocket or quitting Arc also shows
+them again.
 
-**Space is still limited:** if too many icons are beside the notch, macOS may
-leave some out even when Menu Pocket is open. You’ll need fewer menu bar icons
-to fit them all. This feature still needs more testing with different screens.
+Some apps may not expose their controls to Accessibility, so this first version
+still needs testing with different apps and screens.
 
 ## Screenshots
 

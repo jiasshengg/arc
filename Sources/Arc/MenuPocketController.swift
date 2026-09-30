@@ -5,9 +5,11 @@ import Combine
 @MainActor final class MenuPocketController: NSObject, ObservableObject {
     @Published private(set) var isEnabled = false
     @Published private(set) var isExpanded = true
+    @Published private(set) var isBarOpen = false
 
     private var chevron: NSStatusItem?
     private var spacer: NSStatusItem?
+    private let bar = MenuPocketBar()
     private let defaults: UserDefaults
     private let itemPrefix: String
     private var spacerPadding: NSLayoutConstraint?
@@ -31,6 +33,11 @@ import Combine
         self.defaults = defaults
         self.itemPrefix = itemPrefix
         super.init()
+        bar.onVisibilityChanged = { [weak self] in
+            guard let self else { return }
+            self.isBarOpen = self.bar.isVisible
+            self.updateAppearance()
+        }
     }
 
     var chevronFrame: CGRect? { chevron?.button?.window?.frame }
@@ -90,6 +97,12 @@ import Combine
 
     @objc func toggle() {
         guard isEnabled else { return }
+        if !isExpanded {
+            guard let controlFrame = chevron?.button?.window?.frame,
+                  let dividerFrame = spacer?.button?.window?.frame else { return }
+            bar.toggle(beside: controlFrame, before: dividerFrame)
+            return
+        }
         if isExpanded {
             // Never enlarge a divider placed to the right of our reveal control.
             guard let dividerFrame = spacer?.button?.window?.frame,
@@ -105,6 +118,7 @@ import Combine
     }
 
     func showSetup() {
+        bar.close()
         if isEnabled {
             isArranging = true
             isExpanded = true
@@ -112,7 +126,7 @@ import Combine
         }
         let alert = NSAlert()
         alert.messageText = "Arrange Menu Pocket"
-        alert.informativeText = "Hold Command and drag the icons you want to hide to the left of the vertical line. Keep the line to the left of Arc’s arrow.\n\nKeep Arc’s main icon, battery, Wi-Fi, Search, and Control Centre to the right of the line.\n\nClick the arrow when you’re done. The line and those icons will disappear. Click the arrow again to show the icons. Your apps keep running.\n\nIcons are shown again when Arc starts. If some icons still don’t fit beside the notch, you’ll need fewer icons in the menu bar."
+        alert.informativeText = "Hold Command and drag the icons you want to hide to the left of the vertical line. Keep the line to the left of Arc’s arrow.\n\nKeep Arc’s main icon, battery, Wi-Fi, Search, and Control Centre to the right of the line.\n\nClick the arrow when you’re done. Click it again to open the icons in a row below the menu bar. Arc needs Accessibility permission to find and open those icons. Your apps keep running."
         alert.addButton(withTitle: "Got It")
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
@@ -123,6 +137,7 @@ import Combine
         // so react only to an actual arrangement change and keep the current state.
         let frames = NSScreen.screens.map(\.frame)
         guard frames != screenFrames else { return }
+        bar.close()
         screenFrames = frames
         // A new arrangement can strand the control off-screen; reveal only then.
         if !isExpanded && !isControlReachable {
@@ -149,14 +164,15 @@ import Combine
         spacer?.button?.window?.ignoresMouseEvents = !showsDivider
         spacer?.button?.toolTip = showsDivider
             ? "Hold Command and drag icons to the left of this line to hide them." : nil
-        let title = isExpanded ? "Hide Menu Pocket" : "Show Menu Pocket"
-        chevron?.button?.image = NSImage(systemSymbolName: isExpanded ? "chevron.right" : "chevron.left",
+        let title = isExpanded ? "Hide Menu Pocket" : (isBarOpen ? "Close Menu Pocket" : "Open Menu Pocket")
+        chevron?.button?.image = NSImage(systemSymbolName: isExpanded || isBarOpen ? "chevron.up" : "chevron.down",
                                        accessibilityDescription: title)
         chevron?.button?.toolTip = title
         chevron?.button?.setAccessibilityLabel(title)
     }
 
     private func removeItems() {
+        bar.close()
         // Release the wide spacer first, restoring all other apps' icons.
         if let spacer {
             spacer.length = expandedLength
@@ -218,16 +234,31 @@ extension MenuPocketController {
             }
             button.performClick(nil)
             try? await Task.sleep(for: .milliseconds(300))
+            guard !controller.isExpanded, controller.isBarOpen,
+                  controller.bar.isVisible,
+                  button.toolTip == "Close Menu Pocket" else {
+                print("Menu Pocket click did not open the separate bar")
+                return false
+            }
+            button.performClick(nil)
+            guard !controller.bar.isVisible, !controller.isBarOpen,
+                  button.toolTip == "Open Menu Pocket" else {
+                print("Menu Pocket click did not close the separate bar")
+                return false
+            }
+            controller.isExpanded = true
+            controller.updateAppearance()
+            try? await Task.sleep(for: .milliseconds(300))
             guard controller.isExpanded,
                   let frame = controller.spacer?.button?.window?.frame,
                   frame.width <= 1, frame.minY > 0 else {
-                print("Menu Pocket click did not restore narrow boundary")
+                print("Menu Pocket did not restore narrow boundary")
                 return false
             }
         }
         controller.setEnabled(false)
         guard controller.spacer == nil, controller.chevron == nil else { return false }
-        print("Menu Pocket native check passed: three click/reveal cycles, 1-point boundary, cleanup")
+        print("Menu Pocket native check passed: three collapse/bar cycles, 1-point boundary, cleanup")
         return true
     }
 }

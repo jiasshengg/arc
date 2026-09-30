@@ -88,7 +88,7 @@ private struct ArcMenu: View {
         }
         Toggle("Menu Pocket", isOn: Binding(get: { menuPocket.isEnabled }, set: menuPocket.setEnabled))
         if menuPocket.isEnabled {
-            Button(menuPocket.isExpanded ? "Hide Menu Icons" : "Show Menu Icons") { menuPocket.toggle() }
+            Button(menuPocket.isExpanded ? "Hide Menu Icons" : (menuPocket.isBarOpen ? "Close Menu Pocket" : "Open Menu Pocket")) { menuPocket.toggle() }
             Button("Arrange Menu Pocket…") { menuPocket.showSetup() }
         }
         Divider()
