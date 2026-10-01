@@ -8,22 +8,10 @@ It runs on your Mac with no account, subscription, or usage tracking.
 Arc is an early version. It includes music controls, battery updates, a temporary
 place to keep files, automatic screenshot copying, and menu bar icon hiding.
 
-## Build And Run
+## Install
 
-You’ll need Xcode 15 or later with its command-line tools selected. Run these
-commands from the project folder:
-
-```sh
-./scripts/build-app.sh
-open dist/Arc.app
-```
-
-The default build is optimized for everyday use. Use `./scripts/build-app.sh debug`
-when you need the development checks below.
-
-You don’t need Homebrew or extra Swift packages. Open `Package.swift` in Xcode
-to edit the app. Use the build script above to run the full app: `swift run`
-doesn’t include the helper Arc needs to connect to your music.
+Download the DMG from [Releases](https://github.com/jiasshengg/arc/releases),
+open it, copy Arc to Applications, and launch Arc.
 
 ## Music Controls
 
@@ -131,6 +119,22 @@ Arc uses SwiftUI and AppKit, with shared logic in `ArcCore` and tests in `Tests/
 The build script creates an app for the type of Mac you’re using and bundles
 the music helper. No third-party Swift packages are needed.
 
+### Build From Source
+
+You’ll need Xcode 15 or later with its command-line tools selected. From the
+project folder, run:
+
+```sh
+./scripts/build-app.sh
+open dist/Arc.app
+```
+
+The default build is optimized for everyday use. Use `./scripts/build-app.sh debug`
+for the development checks below. You don’t need Homebrew or extra Swift
+packages. Open `Package.swift` in Xcode to edit the app. Use the build script
+to run the full app: `swift run` doesn’t include the helper Arc needs to connect
+to your music.
+
 The island uses a transparent window that stays in place while the visible
 content expands. Rounded corners let clicks pass through. Arc prefers the
 built-in notched display and otherwise uses the main display. It supports one
@@ -175,7 +179,7 @@ states.
   menu bars, multiple screens, sleep/wake, Reduce Motion, and VoiceOver.
 - Browser videos can appear as now playing. Arc doesn’t filter them out.
 - Timers, AirPods features, general notifications, and extra islands aren’t included.
-- Automatic updates and release packaging aren’t set up yet.
+- Automatic updates and release packaging aren’t automated yet.
 
 ## License
 
