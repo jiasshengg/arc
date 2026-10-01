@@ -13,6 +13,7 @@ import SwiftUI
     }
 
     private var panel: NSPanel?
+    private var accessTask: Task<Void, Never>?
     var onVisibilityChanged: (() -> Void)?
     var isVisible: Bool { panel?.isVisible == true }
 
@@ -26,6 +27,8 @@ import SwiftUI
 
     func close() {
         guard panel != nil else { return }
+        accessTask?.cancel()
+        accessTask = nil
         panel?.close()
         panel = nil
         onVisibilityChanged?()
@@ -56,6 +59,22 @@ import SwiftUI
         panel = bar
         bar.orderFrontRegardless()
         onVisibilityChanged?()
+        if !trusted { watchForAccess(beside: controlFrame, before: dividerFrame) }
+    }
+
+    private func watchForAccess(beside controlFrame: CGRect, before dividerFrame: CGRect) {
+        accessTask = Task { [weak self] in
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .milliseconds(500)) } catch { return }
+                guard let self, self.isVisible else { return }
+                guard AXIsProcessTrusted() else { continue }
+                self.panel?.close()
+                self.panel = nil
+                self.accessTask = nil
+                self.show(beside: controlFrame, before: dividerFrame)
+                return
+            }
+        }
     }
 
     private func groupedItems(before boundaryX: CGFloat) -> [Item] {
