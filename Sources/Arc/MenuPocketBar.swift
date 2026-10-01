@@ -183,14 +183,20 @@ import SwiftUI
         }
         guard let original = frame(of: element), itemAccess.show(original, beside: controlFrame) else { return false }
         var visibleFrame: CGRect?
+        var settledFrame: CGRect?
         for _ in 0..<10 {
             do { try await Task.sleep(for: .milliseconds(50)) } catch { return false }
             guard !Task.isCancelled, panel === openingPanel else { return false }
             guard let current = frame(of: element), Self.isOnScreen(current, screens: NSScreen.screens.map(\.frame)) else { continue }
-            if current == visibleFrame { break }
+            if current == visibleFrame {
+                settledFrame = current
+                break
+            }
             visibleFrame = current
         }
-        guard !Task.isCancelled, panel === openingPanel, let current = frame(of: element), Self.isOnScreen(current, screens: NSScreen.screens.map(\.frame)) else { return false }
+        guard !Task.isCancelled, panel === openingPanel, let settledFrame,
+              let current = frame(of: element), current == settledFrame,
+              Self.isOnScreen(current, screens: NSScreen.screens.map(\.frame)) else { return false }
 
         var error = AXUIElementPerformAction(element, kAXPressAction as CFString)
         if error == .actionUnsupported {

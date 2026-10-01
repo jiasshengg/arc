@@ -6,13 +6,23 @@ import ApplicationServices
     private struct Placement {
         let window: Int
         let owner: pid_t
-        let original: CGPoint
+        let original: CGRect
     }
     private var placement: Placement?
+    private let windows: () -> [[String: Any]]
+    private let move: ((Int, pid_t, CGPoint, CGPoint, Int?) -> Bool)?
+    var hasPendingItem: Bool { placement != nil }
+
+    init(windows: @escaping () -> [[String: Any]] = {
+        CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID) as? [[String: Any]] ?? []
+    }, move: ((Int, pid_t, CGPoint, CGPoint, Int?) -> Bool)? = nil) {
+        self.windows = windows
+        self.move = move
+    }
 
     func show(_ frame: CGRect, beside control: CGRect) -> Bool {
         _ = restore()
-        guard let window = statusWindow(at: frame),
+        guard !hasPendingItem, let window = statusWindow(at: frame),
               let number = window[kCGWindowNumber as String] as? Int,
               let owner = window[kCGWindowOwnerPID as String] as? Int32 else { return false }
         let original = CGPoint(x: frame.midX, y: frame.midY)
@@ -23,33 +33,49 @@ import ApplicationServices
                                       width: control.width, height: control.height)
         guard let target = statusWindow(at: destinationFrame)?[kCGWindowNumber as String] as? Int,
               drag(window: number, owner: owner, from: original, to: destination, targetWindow: target) else { return false }
-        placement = Placement(window: number, owner: owner, original: original)
+        placement = Placement(window: number, owner: owner, original: frame)
         return true
     }
 
     @discardableResult func restore() -> Bool {
         guard let placement else { return false }
-        self.placement = nil
-        guard let windows = CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID) as? [[String: Any]],
-              let window = windows.first(where: { ($0[kCGWindowNumber as String] as? Int) == placement.window }),
-              let bounds = window[kCGWindowBounds as String] as? [String: Any],
+        guard let window = windows().first(where: {
+            ($0[kCGWindowNumber as String] as? Int) == placement.window
+                && ($0[kCGWindowOwnerPID as String] as? Int32) == placement.owner
+        }) else {
+            // The original item has gone away; never move a reused window ID.
+            self.placement = nil
+            return false
+        }
+        guard let bounds = window[kCGWindowBounds as String] as? [String: Any],
               let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return false }
+        if Self.matches(frame, placement.original) {
+            self.placement = nil
+            return false
+        }
+        // Retain the original placement until a later observation confirms it.
+        // Posting events can succeed even if macOS ignores the move.
         return drag(window: placement.window, owner: placement.owner,
-                    from: CGPoint(x: frame.midX, y: frame.midY), to: placement.original)
+                    from: CGPoint(x: frame.midX, y: frame.midY),
+                    to: CGPoint(x: placement.original.midX, y: placement.original.midY))
     }
 
     private func statusWindow(at frame: CGRect) -> [String: Any]? {
-        let windows = CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID) as? [[String: Any]] ?? []
-        return windows.first { window in
+        return windows().first { window in
             guard (window[kCGWindowLayer as String] as? Int ?? 0) >= Int(CGWindowLevelForKey(.statusWindow)),
                   let bounds = window[kCGWindowBounds as String] as? [String: Any],
                   let windowFrame = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return false }
-            return abs(windowFrame.minX - frame.minX) < 2 && abs(windowFrame.minY - frame.minY) < 2
-                && abs(windowFrame.width - frame.width) < 2 && abs(windowFrame.height - frame.height) < 2
+            return Self.matches(windowFrame, frame)
         }
     }
 
+    private static func matches(_ lhs: CGRect, _ rhs: CGRect) -> Bool {
+        abs(lhs.minX - rhs.minX) < 2 && abs(lhs.minY - rhs.minY) < 2
+            && abs(lhs.width - rhs.width) < 2 && abs(lhs.height - rhs.height) < 2
+    }
+
     private func drag(window: Int, owner: pid_t, from: CGPoint, to: CGPoint, targetWindow: Int? = nil) -> Bool {
+        if let move { return move(window, owner, from, to, targetWindow) }
         guard AXIsProcessTrusted(),
               let down = Self.event(.leftMouseDown, window: window, at: from, command: true),
               let up = Self.event(.leftMouseUp, window: targetWindow ?? window, at: to, command: false) else { return false }

@@ -4,6 +4,61 @@ import XCTest
 @testable import Arc
 
 final class MenuPocketBarTests: XCTestCase {
+    @MainActor func testFailedRestorationKeepsOriginalPlacementAndBlocksAnotherMove() throws {
+        let original = CGRect(x: -3000, y: 0, width: 24, height: 24)
+        let visible = CGRect(x: 876, y: 0, width: 24, height: 24)
+        let control = CGRect(x: 900, y: (NSScreen.screens.first?.frame.maxY ?? 0) - 24,
+                             width: 18, height: 24)
+        var itemFrame = original
+        var permitMove = true
+        var destinations: [CGPoint] = []
+        let access = MenuPocketItemAccess(windows: {
+            [self.window(1, owner: 20, frame: itemFrame),
+             self.window(2, owner: 20, frame: CGRect(x: 900, y: 0, width: 18, height: 24))]
+        }, move: { _, _, _, to, _ in
+            destinations.append(to)
+            return permitMove
+        })
+        XCTAssertTrue(access.show(original, beside: control))
+        itemFrame = visible
+        permitMove = false
+        XCTAssertFalse(access.restore())
+        XCTAssertTrue(access.hasPendingItem)
+        XCTAssertFalse(access.show(visible, beside: control))
+        XCTAssertTrue(access.hasPendingItem)
+        XCTAssertEqual(destinations.last, CGPoint(x: original.midX, y: original.midY))
+
+        permitMove = true
+        XCTAssertTrue(access.restore())
+        XCTAssertTrue(access.hasPendingItem, "Posting events does not confirm restoration")
+        itemFrame = original
+        XCTAssertFalse(access.restore())
+        XCTAssertFalse(access.hasPendingItem)
+    }
+
+    @MainActor func testRestorationNeverMovesReusedWindowFromAnotherProcess() {
+        let original = CGRect(x: -3000, y: 0, width: 24, height: 24)
+        let control = CGRect(x: 900, y: (NSScreen.screens.first?.frame.maxY ?? 0) - 24,
+                             width: 18, height: 24)
+        var owner: Int32 = 20
+        var moves = 0
+        let access = MenuPocketItemAccess(windows: {
+            [self.window(1, owner: owner, frame: original),
+             self.window(2, owner: 20, frame: CGRect(x: 900, y: 0, width: 18, height: 24))]
+        }, move: { _, _, _, _, _ in moves += 1; return true })
+        XCTAssertTrue(access.show(original, beside: control))
+        owner = 21
+        XCTAssertFalse(access.restore())
+        XCTAssertFalse(access.hasPendingItem)
+        XCTAssertEqual(moves, 1)
+    }
+
+    private func window(_ number: Int, owner: Int32, frame: CGRect) -> [String: Any] {
+        [kCGWindowNumber as String: number, kCGWindowOwnerPID as String: owner,
+         kCGWindowLayer as String: Int(CGWindowLevelForKey(.statusWindow)),
+         kCGWindowBounds as String: frame.dictionaryRepresentation]
+    }
+
     @MainActor func testStatusItemEventsTargetOneWindow() throws {
         let point = CGPoint(x: 1000, y: 15)
         let down = try XCTUnwrap(MenuPocketItemAccess.event(.leftMouseDown, window: 42, at: point, command: true))
