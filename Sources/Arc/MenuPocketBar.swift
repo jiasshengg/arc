@@ -37,8 +37,8 @@ import SwiftUI
         let screen = NSScreen.screens.first { $0.frame.intersects(controlFrame) } ?? NSScreen.main
         guard let screen else { return }
 
-        let width = min(max(220, CGFloat(items.count) * 60 + 32), screen.frame.width - 40)
-        let height: CGFloat = 100
+        let width = min(max(220, CGFloat(items.count) * 60 + 24), screen.frame.width - 40)
+        let height: CGFloat = 72
         let x = min(max(screen.frame.minX + 20, controlFrame.midX - width / 2), screen.frame.maxX - width - 20)
         let menuHeight = screen.frame.maxY - screen.visibleFrame.maxY
         let y = screen.frame.maxY - max(menuHeight, 24) - height - 6
@@ -165,7 +165,7 @@ import SwiftUI
                 .buttonStyle(.plain)
                 .help("Close Menu Pocket")
             }
-            .padding(12)
+            .padding(8)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
             .overlay(alignment: .bottom) {
