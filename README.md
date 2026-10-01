@@ -72,8 +72,9 @@ To choose which icons to hide:
    **right of the line**.
 4. Click the arrow. The line and the icons on its left disappear.
 5. Click the arrow again to open a scrollable row below the menu bar. Select an
-   item there to open its original menu bar control. Click the arrow or × to
-   close the row.
+   item there to temporarily show just that icon and open its original control.
+   Click the arrow again to put it back and reopen the row. Click × to close
+   the row.
 
 The arrow points down when the row can be opened and up when it can be closed
 or the inline icons can be hidden.
