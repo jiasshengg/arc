@@ -298,3 +298,26 @@ import SwiftUI
         }
     }
 }
+
+#if DEBUG
+extension MenuPocketBar {
+    static func diagnose() {
+        print("Menu Pocket Accessibility:", AXIsProcessTrusted())
+        let bar = MenuPocketBar()
+        let windows = CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID) as? [[String: Any]] ?? []
+        for window in windows where (window[kCGWindowLayer as String] as? Int) == Int(CGWindowLevelForKey(.statusWindow)) {
+            print("Menu Pocket status window:", window[kCGWindowNumber as String] as Any,
+                  window[kCGWindowBounds as String] as Any)
+        }
+        for item in bar.groupedItems(before: .infinity) {
+            var actions: CFArray?
+            let result = AXUIElementCopyActionNames(item.element, &actions)
+            let itemFrame = bar.frame(of: item.element)
+            let match = itemFrame.flatMap { MenuPocketItemAccess().statusWindow(at: $0) }
+            print("Menu Pocket item:", item.name, "frame:", itemFrame as Any,
+                  "matched window:", match?[kCGWindowNumber as String] as Any,
+                  "actions:", actions as Any, "result:", result.rawValue)
+        }
+    }
+}
+#endif
