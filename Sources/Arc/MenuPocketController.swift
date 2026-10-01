@@ -36,7 +36,7 @@ import Combine
         bar.onVisibilityChanged = { [weak self] in
             guard let self else { return }
             self.isBarOpen = self.bar.isVisible
-            self.updateAppearance()
+            self.updateChevronAppearance()
         }
     }
 
@@ -116,6 +116,7 @@ import Combine
                 return
             }
         }
+        bar.close()
         isArranging = false
         isExpanded.toggle()
         updateAppearance()
@@ -168,6 +169,10 @@ import Combine
         spacer?.button?.window?.ignoresMouseEvents = !showsDivider
         spacer?.button?.toolTip = showsDivider
             ? "Hold Command and drag icons to the left of this line to hide them." : nil
+        updateChevronAppearance()
+    }
+
+    private func updateChevronAppearance() {
         let title = isExpanded ? "Hide Menu Pocket" : (isBarOpen ? "Close Menu Pocket" : "Open Menu Pocket")
         chevron?.button?.image = NSImage(systemSymbolName: isExpanded || isBarOpen ? "chevron.up" : "chevron.down",
                                        accessibilityDescription: title)
@@ -250,6 +255,7 @@ extension MenuPocketController {
                 print("Menu Pocket click did not close the separate bar")
                 return false
             }
+            guard !controller.isExpanded else { return false }
             controller.isExpanded = true
             controller.updateAppearance()
             try? await Task.sleep(for: .milliseconds(300))

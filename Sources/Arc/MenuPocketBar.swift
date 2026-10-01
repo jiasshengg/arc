@@ -14,18 +14,38 @@ import SwiftUI
 
     private var panel: NSPanel?
     private var accessTask: Task<Void, Never>?
+    private var presentationTask: Task<Void, Never>?
     var onVisibilityChanged: (() -> Void)?
+    private let itemAccess = MenuPocketItemAccess()
+    private var controlFrame = CGRect.zero
     var isVisible: Bool { panel?.isVisible == true }
 
     func toggle(beside controlFrame: CGRect, before dividerFrame: CGRect) {
-        if isVisible {
+        if panel != nil || presentationTask != nil {
             close()
             return
         }
-        show(beside: controlFrame, before: dividerFrame)
+        let restoring = itemAccess.restore()
+        if !restoring {
+            show(beside: controlFrame, before: dividerFrame)
+            return
+        }
+        presentationTask = Task { [weak self] in
+            do { try await Task.sleep(for: .milliseconds(150)) } catch { return }
+            guard let self else { return }
+            self.presentationTask = nil
+            self.show(beside: controlFrame, before: dividerFrame)
+        }
     }
 
     func close() {
+        _ = itemAccess.restore()
+        dismissRow()
+    }
+
+    private func dismissRow() {
+        presentationTask?.cancel()
+        presentationTask = nil
         guard panel != nil else { return }
         accessTask?.cancel()
         accessTask = nil
@@ -35,6 +55,7 @@ import SwiftUI
     }
 
     private func show(beside controlFrame: CGRect, before dividerFrame: CGRect) {
+        self.controlFrame = controlFrame
         let trusted = AXIsProcessTrusted()
         let items = trusted ? groupedItems(before: dividerFrame.minX) : []
         let screen = NSScreen.screens.first { $0.frame.intersects(controlFrame) } ?? NSScreen.main
@@ -146,19 +167,67 @@ import SwiftUI
         _ = AXIsProcessTrustedWithOptions(options)
     }
 
-    private func open(_ element: AXUIElement) -> Bool {
-        let error = AXUIElementPerformAction(element, kAXPressAction as CFString)
-        if error == .success { close() }
-        return error == .success
+    private func open(_ element: AXUIElement) async -> Bool {
+        // A hidden status item can accept AXPress without presenting a usable
+        // menu. Move only this item into view before opening its control.
+        guard let openingPanel = panel else { return false }
+        openingPanel.orderOut(nil)
+        onVisibilityChanged?()
+        defer {
+            // Keep failures visible, but never revive a closed or replaced row.
+            if panel === openingPanel {
+                _ = itemAccess.restore()
+                openingPanel.orderFrontRegardless()
+                onVisibilityChanged?()
+            }
+        }
+        guard let original = frame(of: element), itemAccess.show(original, beside: controlFrame) else { return false }
+        var visibleFrame: CGRect?
+        for _ in 0..<10 {
+            do { try await Task.sleep(for: .milliseconds(50)) } catch { return false }
+            guard !Task.isCancelled, panel === openingPanel else { return false }
+            guard let current = frame(of: element), Self.isOnScreen(current, screens: NSScreen.screens.map(\.frame)) else { continue }
+            if current == visibleFrame { break }
+            visibleFrame = current
+        }
+        guard !Task.isCancelled, panel === openingPanel, let current = frame(of: element), Self.isOnScreen(current, screens: NSScreen.screens.map(\.frame)) else { return false }
+
+        var error = AXUIElementPerformAction(element, kAXPressAction as CFString)
+        if error == .actionUnsupported {
+            error = AXUIElementPerformAction(element, kAXShowMenuAction as CFString)
+        }
+        if error == .success {
+            dismissRow()
+            return true
+        }
+        guard error == .actionUnsupported,
+              let down = CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown,
+                                 mouseCursorPosition: CGPoint(x: current.midX, y: current.midY), mouseButton: .left),
+              let up = CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp,
+                               mouseCursorPosition: CGPoint(x: current.midX, y: current.midY), mouseButton: .left) else { return false }
+        // Close our panel before delivering a normal click to the original icon.
+        dismissRow()
+        down.post(tap: .cghidEventTap)
+        up.post(tap: .cghidEventTap)
+        return true
+    }
+
+    static func isOnScreen(_ frame: CGRect, screens: [CGRect]) -> Bool {
+        // Accessibility uses a top-left origin; AppKit uses a bottom-left origin.
+        let top = screens.first?.maxY ?? 0
+        let cocoaFrame = CGRect(x: frame.minX, y: top - frame.maxY,
+                                width: frame.width, height: frame.height)
+        return frame.width > 4 && frame.height > 0 && screens.contains { $0.contains(cocoaFrame) }
     }
 
     private struct BarView: View {
         let items: [Item]
         let trusted: Bool
         let requestAccess: () -> Void
-        let open: (AXUIElement) -> Bool
+        let open: (AXUIElement) async -> Bool
         let close: () -> Void
         @State private var failedName: String?
+        @State private var isOpening = false
 
         var body: some View {
             HStack(spacing: 8) {
@@ -174,7 +243,13 @@ import SwiftUI
                         HStack(spacing: 4) {
                             ForEach(items) { item in
                                 Button {
-                                    if !open(item.element) { failedName = item.name }
+                                    isOpening = true
+                                    failedName = nil
+                                    Task {
+                                        let opened = await open(item.element)
+                                        if !opened { failedName = item.name }
+                                        isOpening = false
+                                    }
                                 } label: {
                                     VStack(spacing: 4) {
                                         Image(nsImage: item.icon)
@@ -189,6 +264,7 @@ import SwiftUI
                                     .frame(width: 56, height: 56)
                                 }
                                 .buttonStyle(.plain)
+                                .disabled(isOpening)
                                 .help(item.name)
                                 .accessibilityLabel(item.name)
                             }
