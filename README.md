@@ -1,7 +1,8 @@
 # Arc
 
 A free, open-source music companion for macOS 14 and later. Arc puts music
-controls beside your MacBook’s notch, or in a small floating bar on other screens.
+controls beside your MacBook’s notch, at the top of a mirrored display, or in
+a small floating bar on other screens.
 It runs on your Mac with no account, subscription, or usage tracking.
 
 Arc is an early version. It includes music controls, battery updates, a temporary
@@ -114,10 +115,11 @@ Arc leaves volume and screen brightness messages to macOS.
 
 ## Privacy And Permissions
 
-Arc runs locally. It doesn’t request Accessibility, Screen Recording,
-Notifications, Automation, or Input Monitoring permissions. Screenshot copying
-reads saved files; Arc doesn’t take pictures of your screen. File access may
-still need the usual macOS folder permission.
+Arc runs locally. Menu Pocket asks for Accessibility permission only to find
+and open hidden menu bar controls in its separate row. Arc doesn’t request
+Screen Recording, Notifications, Automation, or Input Monitoring permissions.
+Screenshot copying reads saved files; Arc doesn’t take pictures of your screen.
+File access may still need the usual macOS folder permission.
 
 The app is not sandboxed, meaning macOS doesn’t restrict it to its own storage
 folder. Music support uses a helper based on Apple’s private MediaRemote system,
@@ -173,11 +175,11 @@ states.
   menu bars, multiple screens, sleep/wake, Reduce Motion, and VoiceOver.
 - Browser videos can appear as now playing. Arc doesn’t filter them out.
 - Timers, AirPods features, general notifications, and extra islands aren’t included.
-- Automatic updates and public releases aren’t set up yet.
+- Automatic updates and release packaging aren’t set up yet.
 
 ## License
 
 Arc uses the MIT license. MediaRemote Adapter keeps its BSD-3-Clause license
 and credit. This version is intended for direct local use, not the Mac App Store.
-Release signing and Apple’s security review for downloaded apps (notarization)
-aren’t set up yet.
+The build script uses a local ad-hoc signature. Developer ID signing and
+notarization for downloaded apps aren’t set up yet.
