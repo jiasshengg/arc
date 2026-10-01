@@ -243,12 +243,19 @@ struct IslandView: View {
                 .accessibilityLabel("Open \(track.title) In Playing App")
             } else {
                 Button(action: coordinator.openMediaApp) {
-                    HStack(spacing: 10) {
+                    HStack {
                         artwork(size: 28)
-                        Text(track.title).font(.system(size: 12, weight: .medium)).lineLimit(1)
                         Spacer(minLength: 0)
                         playbackIndicator(track.isPlaying)
-                    }.padding(.horizontal, 8)
+                    }
+                    .overlay {
+                        Text(track.title)
+                            .font(.system(size: 12, weight: .medium))
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, 40)
+                    }
+                    .padding(.horizontal, 8)
                 }
                 .buttonStyle(.plain)
                 .help("Open Playing App")
