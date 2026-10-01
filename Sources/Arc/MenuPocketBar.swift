@@ -92,12 +92,30 @@ import SwiftUI
                 guard let frame = frame(of: element), frame.width > 4,
                       frame.minX < boundaryX else { continue }
                 let name = label(of: element) ?? app.localizedName ?? "Menu Bar Item"
-                let icon = app.icon ?? NSImage(systemSymbolName: "app", accessibilityDescription: name) ?? NSImage()
+                let icon = icon(for: app, name: name)
                 result.append(Item(id: "\(app.processIdentifier)-\(index)", element: element,
                                    name: name, icon: icon, x: frame.minX))
             }
         }
         return result.sorted { $0.x > $1.x }
+    }
+
+    private func icon(for app: NSRunningApplication, name: String) -> NSImage {
+        let source = app.icon ?? NSImage(systemSymbolName: "app", accessibilityDescription: name) ?? NSImage()
+        guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 48, pixelsHigh: 48,
+                                           bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+                                           isPlanar: false, colorSpaceName: .deviceRGB,
+                                           bytesPerRow: 0, bitsPerPixel: 0),
+              let context = NSGraphicsContext(bitmapImageRep: bitmap) else { return source }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        source.draw(in: CGRect(x: 0, y: 0, width: 48, height: 48))
+        context.flushGraphics()
+        NSGraphicsContext.restoreGraphicsState()
+        bitmap.size = NSSize(width: 24, height: 24)
+        let image = NSImage(size: bitmap.size)
+        image.addRepresentation(bitmap)
+        return image
     }
 
     private func frame(of element: AXUIElement) -> CGRect? {
