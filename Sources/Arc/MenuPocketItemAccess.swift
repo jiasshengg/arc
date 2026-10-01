@@ -24,8 +24,10 @@ import ApplicationServices
         _ = restore()
         guard !hasPendingItem, let window = statusWindow(at: frame),
               let number = window[kCGWindowNumber as String] as? Int,
-              let owner = window[kCGWindowOwnerPID as String] as? Int32 else { return false }
-        let original = CGPoint(x: frame.midX, y: frame.midY)
+              let owner = window[kCGWindowOwnerPID as String] as? Int32,
+              let bounds = window[kCGWindowBounds as String] as? [String: Any],
+              let windowFrame = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return false }
+        let original = CGPoint(x: windowFrame.midX, y: windowFrame.midY)
         // Drop on the arrow's left edge, on the visible side of the spacer.
         let top = NSScreen.screens.first?.frame.maxY ?? 0
         let destination = CGPoint(x: control.minX + 1, y: top - control.midY)
@@ -33,7 +35,7 @@ import ApplicationServices
                                       width: control.width, height: control.height)
         guard let target = statusWindow(at: destinationFrame)?[kCGWindowNumber as String] as? Int,
               drag(window: number, owner: owner, from: original, to: destination, targetWindow: target) else { return false }
-        placement = Placement(window: number, owner: owner, original: frame)
+        placement = Placement(window: number, owner: owner, original: windowFrame)
         return true
     }
 
@@ -60,12 +62,19 @@ import ApplicationServices
                     to: CGPoint(x: placement.original.midX, y: placement.original.midY))
     }
 
-    private func statusWindow(at frame: CGRect) -> [String: Any]? {
+    func statusWindow(at frame: CGRect) -> [String: Any]? {
         return windows().first { window in
             guard (window[kCGWindowLayer as String] as? Int ?? 0) >= Int(CGWindowLevelForKey(.statusWindow)),
                   let bounds = window[kCGWindowBounds as String] as? [String: Any],
                   let windowFrame = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return false }
-            return Self.matches(windowFrame, frame)
+            // AX describes the clickable content, not the whole hosting window.
+            // macOS can add vertical padding and expand the AX hit area sideways.
+            return abs(windowFrame.midX - frame.midX) < 2
+                && abs(windowFrame.midY - frame.midY) < 2
+                && frame.width <= windowFrame.width + 4
+                && frame.height <= windowFrame.height + 4
+                && windowFrame.width <= frame.width + 16
+                && windowFrame.height <= frame.height + 16
         }
     }
 
@@ -77,8 +86,8 @@ import ApplicationServices
     private func drag(window: Int, owner: pid_t, from: CGPoint, to: CGPoint, targetWindow: Int? = nil) -> Bool {
         if let move { return move(window, owner, from, to, targetWindow) }
         guard AXIsProcessTrusted(),
-              let down = Self.event(.leftMouseDown, window: window, at: from, command: true),
-              let up = Self.event(.leftMouseUp, window: targetWindow ?? window, at: to, command: false) else { return false }
+              let down = Self.event(.leftMouseDown, window: window, at: from, command: true, owner: owner),
+              let up = Self.event(.leftMouseUp, window: targetWindow ?? window, at: to, command: false, owner: owner) else { return false }
         let pointer = CGEvent(source: nil)?.location
         down.postToPid(owner)
         up.post(tap: .cgSessionEventTap)
@@ -86,7 +95,7 @@ import ApplicationServices
         return true
     }
 
-    static func event(_ type: NSEvent.EventType, window: Int, at point: CGPoint, command: Bool) -> CGEvent? {
+    static func event(_ type: NSEvent.EventType, window: Int, at point: CGPoint, command: Bool, owner: pid_t = 0) -> CGEvent? {
         // AppKit supplies the native window number through its public event API.
         guard let event = NSEvent.mouseEvent(with: type, location: .zero,
                                              modifierFlags: command ? .command : [],
@@ -94,6 +103,9 @@ import ApplicationServices
                                              windowNumber: window, context: nil,
                                              eventNumber: 0, clickCount: 1, pressure: 1)?.cgEvent else { return nil }
         event.location = point
+        event.setIntegerValueField(.eventTargetUnixProcessID, value: Int64(owner))
+        event.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: Int64(window))
+        event.setIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent, value: Int64(window))
         return event
     }
 }

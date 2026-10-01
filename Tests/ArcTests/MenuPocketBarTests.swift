@@ -4,6 +4,29 @@ import XCTest
 @testable import Arc
 
 final class MenuPocketBarTests: XCTestCase {
+    @MainActor func testAccessibilityContentMatchesPaddedStatusWindow() {
+        // Observed locally: AX is 36x24 at (954, 4.5), hosting window is
+        // 34x33 at (955, 0). They share a center, not a size or origin.
+        let content = CGRect(x: -2046, y: 4.5, width: 36, height: 24)
+        let original = CGRect(x: -2045, y: 0, width: 34, height: 33)
+        let control = CGRect(x: 900, y: (NSScreen.screens.first?.frame.maxY ?? 0) - 33,
+                             width: 34, height: 33)
+        var itemFrame = original
+        var selectedWindow: Int?
+        let access = MenuPocketItemAccess(windows: {
+            [self.window(99, owner: 20, frame: CGRect(x: -3000, y: 0, width: 4000, height: 33)),
+             self.window(1, owner: 20, frame: itemFrame),
+             self.window(2, owner: 20, frame: CGRect(x: 900, y: 0, width: 34, height: 33))]
+        }, move: { window, _, _, _, _ in selectedWindow = window; return true })
+        XCTAssertTrue(access.show(content, beside: control))
+        XCTAssertEqual(selectedWindow, 1, "Match the icon window, not the large spacer")
+        itemFrame = CGRect(x: 866, y: 0, width: 34, height: 33)
+        XCTAssertTrue(access.restore())
+        itemFrame = original
+        XCTAssertFalse(access.restore())
+        XCTAssertFalse(access.hasPendingItem, "Compare restored window geometry with the original window")
+    }
+
     @MainActor func testFailedRestorationKeepsOriginalPlacementAndBlocksAnotherMove() throws {
         let original = CGRect(x: -3000, y: 0, width: 24, height: 24)
         let visible = CGRect(x: 876, y: 0, width: 24, height: 24)
@@ -61,12 +84,17 @@ final class MenuPocketBarTests: XCTestCase {
 
     @MainActor func testStatusItemEventsTargetOneWindow() throws {
         let point = CGPoint(x: 1000, y: 15)
-        let down = try XCTUnwrap(MenuPocketItemAccess.event(.leftMouseDown, window: 42, at: point, command: true))
+        let down = try XCTUnwrap(MenuPocketItemAccess.event(.leftMouseDown, window: 42, at: point, command: true, owner: 20))
         XCTAssertEqual(NSEvent(cgEvent: down)?.windowNumber, 42)
         XCTAssertEqual(down.type, .leftMouseDown)
         XCTAssertEqual(down.location, point)
+        XCTAssertEqual(down.getIntegerValueField(.eventTargetUnixProcessID), 20)
+        XCTAssertEqual(down.getIntegerValueField(.mouseEventWindowUnderMousePointer), 42)
+        XCTAssertEqual(down.getIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent), 42)
         XCTAssertTrue(down.flags.contains(.maskCommand))
-        let up = try XCTUnwrap(MenuPocketItemAccess.event(.leftMouseUp, window: 42, at: point, command: false))
+        let up = try XCTUnwrap(MenuPocketItemAccess.event(.leftMouseUp, window: 42, at: point, command: false, owner: 20))
+        XCTAssertEqual(up.getIntegerValueField(.eventTargetUnixProcessID), 20)
+        XCTAssertEqual(up.getIntegerValueField(.mouseEventWindowUnderMousePointer), 42)
         XCTAssertEqual(up.type, .leftMouseUp)
         XCTAssertFalse(up.flags.contains(.maskCommand))
     }
