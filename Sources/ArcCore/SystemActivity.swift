@@ -10,10 +10,10 @@ public struct SystemActivity: Equatable, Sendable {
     }
     public var title: String {
         switch kind {
-        case .charging: return "Power connected"
-        case .unplugged: return "On battery"
-        case .lowBattery: return "Low battery"
-        case .charged: return "Fully charged"
+        case .charging: return "Power Connected"
+        case .unplugged: return "On Battery"
+        case .lowBattery: return "Low Battery"
+        case .charged: return "Fully Charged"
         }
     }
     public var symbol: String {

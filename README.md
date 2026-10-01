@@ -1,94 +1,202 @@
 # Arc
 
-A free, open-source Dynamic Island-style music companion for macOS 14+.
-Native SwiftUI and AppKit. No accounts, backend, telemetry, or subscriptions.
+> Music controls, useful files, and a little more room in your menu bar.
 
-**Local prototype:** compact now playing, hover-to-expand artwork and transport
-controls, live progress, paused and idle states, battery indicators,
-and menu-bar settings.
+Arc is a free, open-source utility for macOS 14 and later. It places a small
+island beside your MacBook’s notch, at the top of a mirrored display, or below
+the menu bar on other screens. Everything runs locally, with no account,
+subscription, or usage tracking.
 
-## Build and run
+## Features
 
-Requires Xcode 15+ with its command-line tools selected. No Homebrew packages or
-third-party Swift dependencies are needed.
+- **Music controls:** See what’s playing, pause, skip, seek, or open the playing app.
+- **Pocket:** Keep files and folders close by without moving the originals.
+- **Menu Pocket:** Hide less-used menu bar icons and open them from a separate row.
+- **Screenshot copying:** Copy newly saved screenshots to the clipboard automatically.
+- **Battery updates:** See brief charging and low-battery messages in the island.
+
+Arc is still an early version. See [Known Limits](#known-limits) before relying on
+it across different Macs and media apps.
+
+## Install
+
+1. Download the DMG from [Releases](https://github.com/jiasshengg/arc/releases).
+2. Open the DMG and copy Arc to Applications.
+3. Launch Arc from Applications. Its icon appears in the menu bar.
+
+The DMG does not require Xcode, Homebrew, or terminal commands.
+
+## Music Controls
+
+Play music or a video, then move your pointer over the island to open its
+controls. You can pause, change tracks, drag the progress bar to move through
+a track, or click the artwork to open the app that’s playing. Paused tracks
+stay visible.
+
+Click Arc’s main icon in the menu bar for these options:
+
+- **Show Island** — show or hide the music bar.
+- **Launch At Login** — start Arc when you log in. This is off by default.
+- **Try Connecting Again** — reconnect if Arc can’t read what’s playing.
+- **Open Pocket…** — open your temporary file list.
+- **Quit Arc** — close Arc.
+
+Keep Arc in a permanent folder before turning on **Launch At Login**. macOS
+may ask you to allow it in System Settings.
+
+## Pocket
+
+Drag files or folders from Finder onto the island to keep them nearby.
+The first five appear in the island. If you add more, click **More** or choose
+**Open Pocket…** from Arc’s menu to see the full list.
+
+Drag a file from Pocket into another app, such as Mail or Messages. Click **×**
+to remove one item from Pocket, or **Clear** to empty the list. Your original
+files stay where they are. Pocket’s list clears when Arc quits.
+
+Pocket doesn’t upload or duplicate your files. If you move or delete an original
+file, its entry shows a warning. Adding the same file twice won’t create a
+second entry. You can add existing files and folders; pasting text or dragging
+images straight from a browser isn’t supported yet. Dragging into different
+apps still needs more testing.
+
+## Menu Pocket
+
+Turn on **Menu Pocket** in Arc’s menu. An arrow appears in the menu bar.
+To choose which icons to hide:
+
+1. Choose **Arrange Menu Pocket…**. A temporary vertical line appears.
+2. Hold **Command** and drag icons you want to hide, such as ChatGPT or Teams,
+   to the **left of the line**. Keep the line to the **left of Arc’s arrow**.
+3. Keep Arc’s main icon, battery, Wi-Fi, Search, and Control Centre to the
+   **right of the line**.
+4. Click the arrow. The line and the icons on its left disappear.
+5. Click the arrow again to open a scrollable row below the menu bar. Select an
+   item there to open its original menu bar control. Click the arrow or × to
+   close the row.
+
+The arrow points down when the row can be opened and up when it can be closed
+or the inline icons can be hidden.
+
+Your apps keep running while their icons are hidden. Arc doesn’t choose or move
+icons for you. Icons from newly opened apps may appear in the hidden group.
+
+The setup line only appears while you’re arranging icons. Arc remembers whether
+Menu Pocket is on, and macOS manages the icon positions. When Arc starts with
+Menu Pocket already on, your chosen icons start hidden. The row needs
+Accessibility permission to find and open other apps’ menu bar controls. It
+uses each app’s icon and name to represent the control; these may differ from
+the tiny icon in the menu bar. Turning off Menu Pocket or quitting Arc shows
+the icons again.
+
+Some apps may not expose their controls to Accessibility, so this first version
+still needs testing with different apps and screens.
+
+## Screenshots
+
+Take a screenshot with **Shift-Command-3** or **Shift-Command-4**. Arc copies
+newly saved screenshots to the clipboard and briefly shows **Screenshot Copied**
+in the island. You can paste the image into another app. The saved file stays
+where macOS put it.
+
+Arc watches the screenshot folder set in macOS. Restart Arc if you change that
+folder. macOS may ask for permission to read it. Ordinary images added to the
+folder are ignored.
+
+Holding **Control** with the screenshot shortcut already copies the image
+directly to the clipboard. It doesn’t save a file, so Arc won’t show a message.
+
+## Battery Updates
+
+Arc briefly shows when you connect or disconnect power, fully charge the
+battery, or reach 20% and 10%. Each update lasts 1.5 seconds before your music
+returns. You can also check the battery level in Arc’s menu.
+
+Arc leaves volume and screen brightness messages to macOS.
+
+## Privacy And Permissions
+
+Arc runs locally. Menu Pocket asks for Accessibility permission only to find
+and open hidden menu bar controls in its separate row. Arc doesn’t request
+Screen Recording, Notifications, Automation, or Input Monitoring permissions.
+Screenshot copying reads saved files; Arc doesn’t take pictures of your screen.
+File access may still need the usual macOS folder permission.
+
+The app is not sandboxed, meaning macOS doesn’t restrict it to its own storage
+folder. Music support uses a helper based on Apple’s private MediaRemote system,
+which may stop working after a macOS update.
+
+## For Developers
+
+Arc uses SwiftUI and AppKit, with shared logic in `ArcCore` and tests in `Tests/`.
+The build script creates an app for the type of Mac you’re using and bundles
+the music helper. No third-party Swift packages are needed.
+
+### Build From Source
+
+You’ll need Xcode 15 or later with its command-line tools selected. From the
+project folder, run:
 
 ```sh
 ./scripts/build-app.sh
 open dist/Arc.app
 ```
 
-Hover over the MacBook notch (or the floating pill on a display without a notch). Start playback in a media app to
-see its title and artwork; hover to reveal previous, play/pause, and next.
-Arc's capsule icon in the menu bar provides show/hide, launch at login, retry
-when the media connection fails, and Quit. Launch at login is off by default;
-it uses the system's actual registration status. Keep the app in a stable
-location before enabling it.
+The default build is optimized for everyday use. Use `./scripts/build-app.sh debug`
+for the development checks below. You don’t need Homebrew or extra Swift
+packages. Open `Package.swift` in Xcode to edit the app. Use the build script
+to run the full app: `swift run` doesn’t include the helper Arc needs to connect
+to your music.
 
-Open `Package.swift` in Xcode to edit and run tests. Use the script to run the
-complete app: `swift run` alone does not bundle the media helper and will show
-“Media integration unavailable.” The build targets the current Mac's architecture.
+The island uses a transparent window that stays in place while the visible
+content expands. Rounded corners let clicks pass through. Arc prefers the
+built-in notched display and otherwise uses the main display. It supports one
+island at a time.
 
-## Verify
+Music updates come from the bundled BSD-licensed
+[MediaRemote Adapter](https://github.com/ungive/mediaremote-adapter), whose source
+is kept in `Vendor/`. Arc runs it in a separate process through Apple’s system
+Perl. The helper sends music details and playback commands. If it fails, use
+**Try Connecting Again**. Arc restarts the connection after your Mac wakes.
+
+Battery updates use IOKit. Screenshot copying watches the saved screenshot
+folder and checks the file information macOS adds to screenshots. These checks
+pause during sleep. Battery monitoring also pauses when the island is hidden.
+
+### Run Checks
 
 ```sh
 swift test
-# Development build only: read real media for two seconds without changing playback.
+./scripts/build-app.sh debug
+# Measure UI CPU usage with synthetic media (keep the pointer away from the island).
+dist/Arc.app/Contents/MacOS/Arc --performance-check
+# Check the music connection without changing playback.
 dist/Arc.app/Contents/MacOS/Arc --smoke-test
-# Render synthetic UI fixtures without screen capture permissions.
+# Test Menu Pocket’s buttons and layout with temporary menu bar items.
+dist/Arc.app/Contents/MacOS/Arc --menu-pocket-smoke-test
+# Read the current battery status.
+dist/Arc.app/Contents/MacOS/Arc --system-smoke-test
+# Create sample images of the app for checking its appearance.
 dist/Arc.app/Contents/MacOS/Arc --render-previews "$PWD/.build/previews"
 ```
 
-Tests cover metadata replacement, malformed values, paused/progress behavior,
-hover cancellation, hidden state, and display geometry. Preview fixtures cover
-idle, compact, expanded, paused, long titles, missing artwork, and unavailable.
+The extra command options above are available in debug builds only. Tests cover
+music details, playback progress, show/hide behavior, file handling, and layout.
+The sample images include playing, paused, empty, error, screenshot, and Pocket
+states.
 
-Still needs hands-on validation across Apple Music, Spotify, browsers, fullscreen
-Spaces, menu-bar auto-hide, sleep/wake, monitor changes, Reduce Motion, and VoiceOver.
-This prototype has been compiled and its media bridge exercised on macOS 26;
-macOS 14 and Intel runtime compatibility have not yet been tested.
+### Known Limits
 
-## How it works
-
-A non-activating AppKit panel hosts SwiftUI on the built-in notched display when
-available, otherwise the primary menu-bar display. It measures the camera housing
-from NSScreen’s safe-area and auxiliary-area geometry. Compact artwork and bars
-sit on either side of the notch; expanded controls stay below it. On notchless
-displays, the pill floats below the menu bar. A stationary transparent window
-hosts a single SwiftUI spring animation, keeping expansion anchored at the top.
-Pointer hit testing follows the visible shape inside that canvas. Pointer movement controls expansion after 100 ms and
-collapse after 100 ms. Rounded transparent corners allow clicks through.
-Paused music stays visible. Progress refreshes only while playing and expanded;
-the equalizer runs at 30 updates per second while playing for smoother motion
-and stops when hidden, paused, or Reduce Motion is enabled.
-
-MediaRemote is private and direct in-process access is restricted on recent
-macOS versions. Arc bundles the BSD-licensed
-[MediaRemote Adapter](https://github.com/ungive/mediaremote-adapter), pinned as
-source under `Vendor/`. It runs through Apple's system Perl, streams complete
-metadata updates, and sends commands to the active system media session.
-The bridge is isolated in a child process and missing/broken helpers produce an
-unavailable state with a manual retry. Arc restarts the listener after wake.
-No Accessibility, Screen Recording, Notifications, or Automation permission is
-requested by Arc. The app is not sandboxed.
-
-Power connection, disconnection, full charge, and low battery (20% and 10%) show
-battery feedback. Each indicator lasts 1.5 seconds after the latest change, then
-returns to music or idle. Battery status also appears in the menu. Monitoring
-pauses when hidden or asleep and uses IOKit power-source notifications.
-Arc does not monitor volume, brightness, or keyboard input and requires no Input
-Monitoring permission. macOS handles volume and brightness feedback.
-
-Read-only local check: `dist/Arc.app/Contents/MacOS/Arc --system-smoke-test`.
-Physical charger transition testing remains manual.
-
-The prototype has no timer, AirPods, general notifications, or multi-display
-islands. It also displays browser media when macOS reports it; there is no
-reliable universal music-only filter. Notifications drive media updates; there
-is no periodic polling fallback yet. Private API compatibility may change.
+- Tested locally on macOS 26. Running on macOS 14 and Intel Macs still needs testing.
+- More testing is needed with different music apps, full-screen apps, hidden
+  menu bars, multiple screens, sleep/wake, Reduce Motion, and VoiceOver.
+- Browser videos can appear as now playing. Arc doesn’t filter them out.
+- Timers, AirPods features, general notifications, and extra islands aren’t included.
+- Automatic updates and release packaging aren’t automated yet.
 
 ## License
 
-Arc is MIT licensed. The vendored MediaRemote Adapter retains its BSD-3-Clause
-license and attribution. This private integration is intended for direct local
-use, not Mac App Store distribution. Release publishing, notarization, signing
-identities, and update infrastructure are outside the prototype scope.
+Arc uses the MIT license. MediaRemote Adapter keeps its BSD-3-Clause license
+and credit. This version is intended for direct local use, not the Mac App Store.
+The build script uses a local ad-hoc signature. Developer ID signing and
+notarization for downloaded apps aren’t set up yet.

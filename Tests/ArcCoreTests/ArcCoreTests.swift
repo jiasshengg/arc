@@ -5,6 +5,36 @@ import CoreGraphics
 final class ArcCoreTests: XCTestCase {
     let epoch = Date(timeIntervalSince1970: 100)
 
+    @MainActor func testVisualWorkStopsWhenHiddenSleepingOrCovered() async throws {
+        let model = IslandModel(enterDelay: 0)
+        model.receive(.media(NowPlayingSnapshot(title: "Track", isPlaying: true)))
+        XCTAssertTrue(model.shouldAnimatePlayback)
+        XCTAssertFalse(model.shouldTick)
+        model.hover(true)
+        try await Task.sleep(for: .milliseconds(20))
+        XCTAssertTrue(model.shouldTick)
+        model.displayAwake = false
+        XCTAssertFalse(model.shouldTick)
+        XCTAssertFalse(model.shouldAnimatePlayback)
+        model.displayAwake = true
+        model.lowPowerMode = true
+        XCTAssertTrue(model.shouldTick)
+        XCTAssertFalse(model.shouldAnimatePlayback)
+        model.lowPowerMode = false
+        XCTAssertTrue(model.shouldAnimatePlayback)
+        model.showScreenshotCopied()
+        XCTAssertFalse(model.shouldTick)
+        XCTAssertFalse(model.shouldAnimatePlayback)
+        model.clearScreenshotFeedback()
+        XCTAssertTrue(model.shouldAnimatePlayback)
+        model.setEnabled(false)
+        XCTAssertFalse(model.shouldAnimatePlayback)
+        XCTAssertFalse(model.shouldTick)
+        model.setEnabled(true)
+        model.receive(.media(NowPlayingSnapshot(title: "Paused", isPlaying: false)))
+        XCTAssertFalse(model.shouldAnimatePlayback)
+    }
+
     func testProgressExtrapolatesAndClamps() {
         let track = NowPlayingSnapshot(title: "Track", duration: 120, elapsed: 30, observedAt: epoch, isPlaying: true, playbackRate: 2)
         XCTAssertEqual(track.position(at: epoch.addingTimeInterval(10)), 50)
@@ -15,6 +45,15 @@ final class ArcCoreTests: XCTestCase {
     func testPausedDoesNotAdvance() {
         let track = NowPlayingSnapshot(title: "Track", duration: 120, elapsed: 30, observedAt: epoch)
         XCTAssertEqual(track.position(at: epoch.addingTimeInterval(60)), 30)
+    }
+
+    func testSeekingClampsAndResetsObservationTime() {
+        let track = NowPlayingSnapshot(title: "Track", duration: 120, elapsed: 30,
+                                       observedAt: epoch, isPlaying: true)
+        let seekDate = epoch.addingTimeInterval(10)
+        XCTAssertEqual(track.seeking(to: 75, at: seekDate).position(at: seekDate), 75)
+        XCTAssertEqual(track.seeking(to: -5, at: seekDate).position(at: seekDate), 0)
+        XCTAssertEqual(track.seeking(to: 150, at: seekDate).position(at: seekDate), 120)
     }
 
     func testMalformedNumbersAreNormalized() {
@@ -66,6 +105,19 @@ final class ArcCoreTests: XCTestCase {
         XCTAssertEqual(moved.maxY, external.maxY - 8)
     }
 
+    func testMirroredNotchlessDisplayAttachesToTop() {
+        let screen = CGRect(x: -2560, y: 200, width: 2560, height: 1080)
+        let visible = CGRect(x: -2560, y: 260, width: 2560, height: 996)
+        for expanded in [false, true] {
+            let size = IslandLayout.size(expanded: expanded, hasMedia: true)
+            let mirrored = IslandLayout.frame(screen: screen, visible: visible, safeTop: 0, size: size, mirrored: true)
+            XCTAssertEqual(mirrored.maxY, screen.maxY)
+            XCTAssertEqual(mirrored.midX, screen.midX)
+            let unmirrored = IslandLayout.frame(screen: screen, visible: visible, safeTop: 0, size: size, mirrored: false)
+            XCTAssertEqual(unmirrored.maxY, visible.maxY - 8)
+        }
+    }
+
     func testExpansionKeepsTopCenterFixed() {
         let screen = CGRect(x: 0, y: 0, width: 1920, height: 1080)
         let compact = IslandLayout.frame(screen: screen, visible: screen, safeTop: 0, size: IslandLayout.size(expanded: false, hasMedia: true))
@@ -84,7 +136,7 @@ final class ArcCoreTests: XCTestCase {
         let compact = IslandLayout.size(expanded: false, hasMedia: true, notch: notch)
         let expanded = IslandLayout.size(expanded: true, hasMedia: true, notch: notch)
         XCTAssertEqual(compact.width - notch.width, 88)
-        XCTAssertEqual(expanded.height - notch.height, 148)
+        XCTAssertEqual(expanded.height - notch.height, 164)
         let screen = CGRect(x: -1512, y: 200, width: 1512, height: 982)
         for size in [compact, expanded, IslandLayout.size(expanded: false, hasMedia: false, notch: notch)] {
             let frame = IslandLayout.frame(screen: screen, visible: screen.insetBy(dx: 0, dy: 32), safeTop: notch.height, size: size)

@@ -1,18 +1,20 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-configuration="${1:-debug}"
+configuration="${1:-release}"
 if [[ "$configuration" != debug && "$configuration" != release ]]; then
   echo "Usage: $0 [debug|release]" >&2
   exit 1
 fi
 swift build -c "$configuration"
+swift scripts/generate-app-icon.swift
 bin_path="$(swift build -c "$configuration" --show-bin-path)"
 app="$PWD/dist/Arc.app"
 framework="$app/Contents/Frameworks/MediaRemoteAdapter.framework"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$framework/Versions/A/Resources"
 cp "$bin_path/Arc" "$app/Contents/MacOS/Arc"
 cp Resources/Info.plist "$app/Contents/Info.plist"
+cp .build/app-icon/AppIcon.icns "$app/Contents/Resources/"
 cp Vendor/mediaremote-adapter/bin/mediaremote-adapter.pl "$app/Contents/Resources/"
 cp Vendor/mediaremote-adapter/LICENSE "$app/Contents/Resources/MediaRemoteAdapter-LICENSE"
 cp LICENSE "$app/Contents/Resources/Arc-LICENSE"

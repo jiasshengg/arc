@@ -38,6 +38,15 @@ public struct NowPlayingSnapshot: Equatable, Sendable {
         guard let duration else { return 0 }
         return min(1, max(0, position(at: date) / duration))
     }
+
+    public func seeking(to position: TimeInterval, at date: Date = Date()) -> NowPlayingSnapshot {
+        NowPlayingSnapshot(
+            title: title, artist: artist, album: album,
+            sourceBundleIdentifier: sourceBundleIdentifier, artworkData: artworkData,
+            duration: duration, elapsed: min(duration ?? .greatestFiniteMagnitude, max(0, position)),
+            observedAt: date, isPlaying: isPlaying, playbackRate: playbackRate
+        )
+    }
 }
 
 public enum MediaState: Equatable, Sendable {
@@ -60,6 +69,7 @@ public enum MediaCommand: String, Sendable {
     func start()
     func stop()
     func send(_ command: MediaCommand)
+    func seek(to position: TimeInterval)
 }
 
 /// The adapter is asked for complete payloads, so tracks never inherit old fields.

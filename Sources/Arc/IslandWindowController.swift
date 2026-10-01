@@ -29,10 +29,12 @@ private final class IslandPanel: NSPanel {
         panel.isMovable = false
         panel.isReleasedWhenClosed = false
         panel.animationBehavior = .none
-        let hosting = NSHostingView(rootView: IslandView(coordinator: coordinator, onSizeChange: { [weak self] size in
+        let hosting = PocketHostingView(rootView: IslandView(coordinator: coordinator, onSizeChange: { [weak self] size in
             self?.visibleSize = size
             self?.trackPointer()
         }))
+        hosting.model = coordinator.model
+        hosting.registerForDraggedTypes([.fileURL])
         hosting.sizingOptions = []
         panel.contentView = hosting
         observeModel()
@@ -43,11 +45,11 @@ private final class IslandPanel: NSPanel {
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.present() }
         })
-        localMouse = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .rightMouseDown]) { [weak self] event in
+        localMouse = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged, .leftMouseUp, .leftMouseDown, .rightMouseDown]) { [weak self] event in
             self?.trackPointer()
             return event
         }
-        globalMouse = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .rightMouseDown]) { [weak self] _ in
+        globalMouse = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged, .leftMouseUp, .leftMouseDown, .rightMouseDown]) { [weak self] _ in
             self?.trackPointer()
         }
         panel.acceptsMouseMovedEvents = true
@@ -56,8 +58,6 @@ private final class IslandPanel: NSPanel {
     private func observeModel() {
         guard !closed else { return }
         withObservationTracking {
-            _ = coordinator.model.expanded
-            _ = coordinator.model.media
             _ = coordinator.model.enabled
         } onChange: { [weak self] in
             Task { @MainActor in
@@ -79,20 +79,23 @@ private final class IslandPanel: NSPanel {
         let notch = IslandLayout.notchSize(safeTop: screen.safeAreaInsets.top,
                                           leftArea: screen.auxiliaryTopLeftArea, rightArea: screen.auxiliaryTopRightArea)
         coordinator.model.setNotchSize(notch)
+        let displayID = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
+        let mirrored = displayID.map { CGDisplayIsInMirrorSet($0) != 0 } ?? false
+        coordinator.model.displayIsMirrored = mirrored
         // A stationary canvas avoids competing AppKit and SwiftUI layout animations.
-        var canvas = IslandLayout.size(expanded: true, hasMedia: true, notch: notch)
+        var canvas = IslandLayout.pocketSize(expanded: true, count: Pocket.islandCapacity, receiving: false, notch: notch)
         canvas.width += 24
         canvas.height += 16
-        let frame = IslandLayout.frame(screen: screen.frame, visible: screen.visibleFrame, safeTop: notch.height, size: canvas)
+        let frame = IslandLayout.frame(screen: screen.frame, visible: screen.visibleFrame, safeTop: notch.height, size: canvas, mirrored: mirrored)
         if panel.frame != frame { panel.setFrame(frame, display: true) }
         panel.orderFrontRegardless()
         trackPointer()
     }
 
     private func trackPointer() {
-        guard coordinator.model.enabled else { return }
+        guard coordinator.model.enabled, coordinator.model.displayAwake else { return }
         let point = NSEvent.mouseLocation
-        let attached = coordinator.model.notchSize.height > 0
+        let attached = coordinator.model.attachesToTop
         let rect = CGRect(x: panel.frame.midX - visibleSize.width / 2,
                           y: panel.frame.maxY - visibleSize.height,
                           width: visibleSize.width, height: visibleSize.height)
@@ -100,9 +103,10 @@ private final class IslandPanel: NSPanel {
         let shape = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
         // The attached shape has square top corners; the camera housing is reserved space.
         let squareTop = attached && CGRect(x: rect.minX, y: rect.maxY - radius, width: rect.width, height: radius).contains(point)
-        let nowInside = shape.contains(point) || squareTop
+        let overMenuControl = coordinator.menuPocketControlFrame?()?.contains(point) == true
+        let nowInside = !overMenuControl && (shape.contains(point) || squareTop)
         // Transparent rounded corners must not swallow clicks intended for the app below.
-        panel.ignoresMouseEvents = !nowInside
+        panel.ignoresMouseEvents = overMenuControl || (!nowInside && !coordinator.model.receivingFiles && !coordinator.model.draggingFileOut)
         if nowInside != inside {
             inside = nowInside
             coordinator.model.hover(nowInside)
