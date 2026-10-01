@@ -1,24 +1,37 @@
 # Arc
 
-A free, open-source music companion for macOS 14 and later. Arc puts music
-controls beside your MacBook’s notch, at the top of a mirrored display, or in
-a small floating bar on other screens.
-It runs on your Mac with no account, subscription, or usage tracking.
+> Music controls, useful files, and a little more room in your menu bar.
 
-Arc is an early version. It includes music controls, battery updates, a temporary
-place to keep files, automatic screenshot copying, and menu bar icon hiding.
+Arc is a free, open-source utility for macOS 14 and later. It places a small
+island beside your MacBook’s notch, at the top of a mirrored display, or below
+the menu bar on other screens. Everything runs locally, with no account,
+subscription, or usage tracking.
+
+## Features
+
+- **Music controls:** See what’s playing, pause, skip, seek, or open the playing app.
+- **Pocket:** Keep files and folders close by without moving the originals.
+- **Menu Pocket:** Hide less-used menu bar icons and open them from a separate row.
+- **Screenshot copying:** Copy newly saved screenshots to the clipboard automatically.
+- **Battery updates:** See brief charging and low-battery messages in the island.
+
+Arc is still an early version. See [Known Limits](#known-limits) before relying on
+it across different Macs and media apps.
 
 ## Install
 
-Download the DMG from [Releases](https://github.com/jiasshengg/arc/releases),
-open it, copy Arc to Applications, and launch Arc.
+1. Download the DMG from [Releases](https://github.com/jiasshengg/arc/releases).
+2. Open the DMG and copy Arc to Applications.
+3. Launch Arc from Applications. Its icon appears in the menu bar.
+
+The DMG does not require Xcode, Homebrew, or terminal commands.
 
 ## Music Controls
 
-Play music or a video, then move your pointer over the notch or floating bar.
-Arc shows the title, artwork, and playback controls. You can pause, change
-tracks, drag the progress bar to move through a track, or click the artwork
-to open the app that’s playing. Paused tracks stay visible.
+Play music or a video, then move your pointer over the island to open its
+controls. You can pause, change tracks, drag the progress bar to move through
+a track, or click the artwork to open the app that’s playing. Paused tracks
+stay visible.
 
 Click Arc’s main icon in the menu bar for these options:
 
