@@ -47,7 +47,7 @@ import Combine
         NotificationCenter.default.addObserver(self, selector: #selector(screenParametersChanged),
                                                name: NSApplication.didChangeScreenParametersNotification,
                                                object: nil)
-        if defaults.bool(forKey: "menuPocketEnabled") { setEnabled(true) }
+        if defaults.bool(forKey: "menuPocketEnabled") { setEnabled(true, startExpanded: false) }
     }
 
     func stop() {
@@ -56,6 +56,10 @@ import Combine
     }
 
     func setEnabled(_ enabled: Bool) {
+        setEnabled(enabled, startExpanded: true)
+    }
+
+    private func setEnabled(_ enabled: Bool, startExpanded: Bool) {
         guard enabled != isEnabled else { return }
         isEnabled = enabled
         defaults.set(enabled, forKey: "menuPocketEnabled")
@@ -90,8 +94,8 @@ import Combine
             spacerWidth = content.widthAnchor.constraint(equalToConstant: 1)
         }
 
-        // Start revealed so newly added icons and changed arrangements are visible.
-        isExpanded = true
+        // First-time setup is visible; relaunch keeps configured icons hidden.
+        isExpanded = startExpanded
         updateAppearance()
     }
 
@@ -258,7 +262,18 @@ extension MenuPocketController {
         }
         controller.setEnabled(false)
         guard controller.spacer == nil, controller.chevron == nil else { return false }
-        print("Menu Pocket native check passed: three collapse/bar cycles, 1-point boundary, cleanup")
+        controller.stop()
+        defaults.set(true, forKey: "menuPocketEnabled")
+        let relaunched = MenuPocketController(defaults: defaults, itemPrefix: name)
+        defer { relaunched.stop() }
+        relaunched.start()
+        guard !relaunched.isExpanded,
+              (relaunched.spacer?.length ?? 0) >= 500,
+              relaunched.chevron?.button?.toolTip == "Open Menu Pocket" else {
+            print("Menu Pocket did not start collapsed after relaunch")
+            return false
+        }
+        print("Menu Pocket native check passed: three collapse/bar cycles, collapsed relaunch, cleanup")
         return true
     }
 }

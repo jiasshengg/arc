@@ -80,12 +80,12 @@ Your apps keep running while their icons are hidden. Arc doesn’t choose or mov
 icons for you. Icons from newly opened apps may appear in the hidden group.
 
 The setup line only appears while you’re arranging icons. Arc remembers whether
-Menu Pocket is on, and macOS manages the icon positions. The row needs
+Menu Pocket is on, and macOS manages the icon positions. When Arc starts with
+Menu Pocket already on, your chosen icons start hidden. The row needs
 Accessibility permission to find and open other apps’ menu bar controls. It
 uses each app’s icon and name to represent the control; these may differ from
-the tiny icon in the menu bar. Icons return to the menu bar when Arc starts or
-your display setup changes. Turning off Menu Pocket or quitting Arc also shows
-them again.
+the tiny icon in the menu bar. Turning off Menu Pocket or quitting Arc shows
+the icons again.
 
 Some apps may not expose their controls to Accessibility, so this first version
 still needs testing with different apps and screens.
