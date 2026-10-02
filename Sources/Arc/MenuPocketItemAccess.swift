@@ -92,8 +92,8 @@ import ApplicationServices
             // macOS can add vertical padding and expand the AX hit area sideways.
             return abs(windowFrame.midX - frame.midX) < 2
                 && abs(windowFrame.midY - frame.midY) < 2
-                && frame.width <= windowFrame.width + 4
-                && frame.height <= windowFrame.height + 4
+                && frame.width <= windowFrame.width + 8
+                && frame.height <= windowFrame.height + 8
                 && windowFrame.width <= frame.width + 16
                 && windowFrame.height <= frame.height + 16
         }

@@ -4,6 +4,21 @@ import XCTest
 @testable import Arc
 
 final class MenuPocketBarTests: XCTestCase {
+    @MainActor func testArrowProxyMatchesInsetHostingWindow() {
+        let original = CGRect(x: -3000, y: 0, width: 34, height: 33)
+        let control = CGRect(x: 900, y: (NSScreen.screens.first?.frame.maxY ?? 0) - 33,
+                             width: 34, height: 33)
+        var targetWindow: Int?
+        let access = MenuPocketItemAccess(windows: {
+            [self.window(1, owner: 20, frame: original),
+             // Native smoke check: proxy 34x33, host inset 3 points per side.
+             self.window(2, owner: 20, frame: CGRect(x: 903, y: 3, width: 28, height: 27))]
+        }, move: { _, _, _, _, target in targetWindow = target; return true })
+        XCTAssertTrue(access.show(original, beside: control))
+        XCTAssertEqual(targetWindow, 2)
+        XCTAssertNil(access.failureReason)
+    }
+
     @MainActor func testAccessibilityContentMatchesPaddedStatusWindow() {
         // Observed locally: AX is 36x24 at (954, 4.5), hosting window is
         // 34x33 at (955, 0). They share a center, not a size or origin.

@@ -33,6 +33,7 @@ import Combine
         self.defaults = defaults
         self.itemPrefix = itemPrefix
         super.init()
+        bar.currentControlFrame = { [weak self] in self?.chevronFrame }
         bar.onVisibilityChanged = { [weak self] in
             guard let self else { return }
             self.isBarOpen = self.bar.isVisible
@@ -223,6 +224,19 @@ extension MenuPocketController {
               divider.minY > 0, divider.width <= 1 else {
             print("Menu Pocket initial layout failed:", controller.chevronFrame as Any,
                   controller.spacer?.button?.window?.frame as Any)
+            return false
+        }
+        let top = NSScreen.screens.first?.frame.maxY ?? 0
+        let targetFrame = CGRect(x: control.minX, y: top - control.maxY,
+                                 width: control.width, height: control.height)
+        guard MenuPocketItemAccess().statusWindow(at: targetFrame) != nil else {
+            print("Menu Pocket native arrow lookup failed:", targetFrame,
+                  "proxy window:", button.window?.windowNumber as Any)
+            for window in CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID) as? [[String: Any]] ?? []
+                where (window[kCGWindowLayer as String] as? Int) == Int(CGWindowLevelForKey(.statusWindow)) {
+                print("Status window:", window[kCGWindowNumber as String] as Any,
+                      window[kCGWindowBounds as String] as Any)
+            }
             return false
         }
         for _ in 0..<3 {

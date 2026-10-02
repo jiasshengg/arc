@@ -16,6 +16,7 @@ import SwiftUI
     private var accessTask: Task<Void, Never>?
     private var presentationTask: Task<Void, Never>?
     var onVisibilityChanged: (() -> Void)?
+    var currentControlFrame: (() -> CGRect?)?
     private let itemAccess = MenuPocketItemAccess()
     private var controlFrame = CGRect.zero
     private var failureReason: String?
@@ -194,7 +195,15 @@ import SwiftUI
             NSLog("Menu Pocket: AX frame read failed")
             return false
         }
-        guard itemAccess.show(original, beside: controlFrame) else {
+        // Opening/closing the row can relayout status items. Resolve the arrow
+        // at click time instead of using the frame captured when the row opened.
+        do { try await Task.sleep(for: .milliseconds(50)) } catch { return false }
+        guard panel === openingPanel else { return false }
+        guard let arrow = currentControlFrame?() ?? (currentControlFrame == nil ? controlFrame : nil) else {
+            failureReason = "Couldn’t Find The Menu Pocket Arrow"
+            return false
+        }
+        guard itemAccess.show(original, beside: arrow) else {
             failureReason = itemAccess.failureReason
             return false
         }
