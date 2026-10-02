@@ -33,10 +33,12 @@ import Combine
         self.defaults = defaults
         self.itemPrefix = itemPrefix
         super.init()
+        bar.currentControlFrame = { [weak self] in self?.chevronFrame }
+        bar.currentDividerFrame = { [weak self] in self?.spacer?.button?.window?.frame }
         bar.onVisibilityChanged = { [weak self] in
             guard let self else { return }
             self.isBarOpen = self.bar.isVisible
-            self.updateAppearance()
+            self.updateChevronAppearance()
         }
     }
 
@@ -116,6 +118,7 @@ import Combine
                 return
             }
         }
+        bar.close()
         isArranging = false
         isExpanded.toggle()
         updateAppearance()
@@ -168,6 +171,10 @@ import Combine
         spacer?.button?.window?.ignoresMouseEvents = !showsDivider
         spacer?.button?.toolTip = showsDivider
             ? "Hold Command and drag icons to the left of this line to hide them." : nil
+        updateChevronAppearance()
+    }
+
+    private func updateChevronAppearance() {
         let title = isExpanded ? "Hide Menu Pocket" : (isBarOpen ? "Close Menu Pocket" : "Open Menu Pocket")
         chevron?.button?.image = NSImage(systemSymbolName: isExpanded || isBarOpen ? "chevron.up" : "chevron.down",
                                        accessibilityDescription: title)
@@ -220,6 +227,23 @@ extension MenuPocketController {
                   controller.spacer?.button?.window?.frame as Any)
             return false
         }
+        // The remote menu-bar host can finish laying out after the proxy.
+        var arrowFound = false
+        for _ in 0..<10 {
+            try? await Task.sleep(for: .milliseconds(50))
+            guard let current = controller.chevronFrame else { continue }
+            let top = NSScreen.screens.first?.frame.maxY ?? 0
+            let targetFrame = CGRect(x: current.minX, y: top - current.maxY,
+                                     width: current.width, height: current.height)
+            if MenuPocketItemAccess().statusWindow(at: targetFrame) != nil {
+                arrowFound = true
+                break
+            }
+        }
+        guard arrowFound else {
+            print("Menu Pocket native arrow lookup failed:", controller.chevronFrame as Any)
+            return false
+        }
         for _ in 0..<3 {
             button.performClick(nil)
             try? await Task.sleep(for: .milliseconds(300))
@@ -250,6 +274,7 @@ extension MenuPocketController {
                 print("Menu Pocket click did not close the separate bar")
                 return false
             }
+            guard !controller.isExpanded else { return false }
             controller.isExpanded = true
             controller.updateAppearance()
             try? await Task.sleep(for: .milliseconds(300))

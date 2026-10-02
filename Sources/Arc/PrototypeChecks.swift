@@ -30,6 +30,14 @@ import SwiftUI
             }
             return true
         }
+        if args.contains("--menu-pocket-diagnose") {
+            Task {
+                try? await Task.sleep(for: .seconds(1))
+                MenuPocketBar.diagnose()
+                exit(0)
+            }
+            return true
+        }
         if args.contains("--menu-pocket-smoke-test") {
             Task { exit(await MenuPocketController.smokeCheck() ? 0 : 1) }
             return true

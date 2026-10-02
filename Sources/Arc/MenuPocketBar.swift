@@ -14,18 +14,49 @@ import SwiftUI
 
     private var panel: NSPanel?
     private var accessTask: Task<Void, Never>?
+    private var presentationTask: Task<Void, Never>?
     var onVisibilityChanged: (() -> Void)?
+    var currentControlFrame: (() -> CGRect?)?
+    var currentDividerFrame: (() -> CGRect?)?
+    private let itemAccess = MenuPocketItemAccess()
+    private var controlFrame = CGRect.zero
+    private var failureReason: String?
     var isVisible: Bool { panel?.isVisible == true }
 
     func toggle(beside controlFrame: CGRect, before dividerFrame: CGRect) {
-        if isVisible {
+        if panel != nil || presentationTask != nil {
             close()
             return
         }
-        show(beside: controlFrame, before: dividerFrame)
+        let restoring = itemAccess.restore()
+        if !restoring {
+            show(beside: controlFrame, before: dividerFrame)
+            return
+        }
+        presentationTask = Task { [weak self] in
+            guard let self else { return }
+            var previousBoundary: CGFloat?
+            for _ in 0..<20 {
+                do { try await Task.sleep(for: .milliseconds(50)) } catch { return }
+                guard !self.itemAccess.isMoving else { previousBoundary = nil; continue }
+                let boundary = self.groupingBoundary(before: dividerFrame)
+                if boundary == previousBoundary { break }
+                previousBoundary = boundary
+            }
+            guard !Task.isCancelled else { return }
+            self.presentationTask = nil
+            self.show(beside: controlFrame, before: dividerFrame)
+        }
     }
 
     func close() {
+        _ = itemAccess.restore()
+        dismissRow()
+    }
+
+    private func dismissRow() {
+        presentationTask?.cancel()
+        presentationTask = nil
         guard panel != nil else { return }
         accessTask?.cancel()
         accessTask = nil
@@ -34,9 +65,15 @@ import SwiftUI
         onVisibilityChanged?()
     }
 
+    func groupingBoundary(before fallback: CGRect) -> CGFloat {
+        (currentDividerFrame?() ?? fallback).minX
+    }
+
     private func show(beside controlFrame: CGRect, before dividerFrame: CGRect) {
+        let controlFrame = currentControlFrame?() ?? controlFrame
+        self.controlFrame = controlFrame
         let trusted = AXIsProcessTrusted()
-        let items = trusted ? groupedItems(before: dividerFrame.minX) : []
+        let items = trusted ? groupedItems(before: groupingBoundary(before: dividerFrame)) : []
         let screen = NSScreen.screens.first { $0.frame.intersects(controlFrame) } ?? NSScreen.main
         guard let screen else { return }
 
@@ -55,7 +92,8 @@ import SwiftUI
         bar.isFloatingPanel = true
         bar.contentView = NSHostingView(rootView: BarView(items: items, trusted: trusted,
                                                          requestAccess: requestAccess,
-                                                         open: open, close: close))
+                                                         open: open, failureReason: { [weak self] in self?.failureReason },
+                                                         close: close))
         panel = bar
         bar.orderFrontRegardless()
         onVisibilityChanged?()
@@ -146,19 +184,126 @@ import SwiftUI
         _ = AXIsProcessTrustedWithOptions(options)
     }
 
-    private func open(_ element: AXUIElement) -> Bool {
-        let error = AXUIElementPerformAction(element, kAXPressAction as CFString)
-        if error == .success { close() }
-        return error == .success
+    private func open(_ element: AXUIElement) async -> Bool {
+        // A hidden status item can accept AXPress without presenting a usable
+        // menu. Move only this item into view before opening its control.
+        failureReason = nil
+        guard AXIsProcessTrusted() else {
+            failureReason = "Allow Accessibility To Open Menu Icons"
+            NSLog("Menu Pocket: Accessibility access missing at click")
+            return false
+        }
+        guard let openingPanel = panel else { return false }
+        openingPanel.orderOut(nil)
+        onVisibilityChanged?()
+        defer {
+            // Keep failures visible, but never revive a closed or replaced row.
+            if panel === openingPanel {
+                _ = itemAccess.restore()
+                openingPanel.orderFrontRegardless()
+                onVisibilityChanged?()
+            }
+        }
+        guard let original = frame(of: element) else {
+            failureReason = "Couldn’t Read The Original Menu Icon"
+            NSLog("Menu Pocket: AX frame read failed")
+            return false
+        }
+        // Opening/closing the row can relayout status items. Resolve the arrow
+        // at click time instead of using the frame captured when the row opened.
+        do { try await Task.sleep(for: .milliseconds(50)) } catch { return false }
+        guard panel === openingPanel else { return false }
+        guard let arrow = currentControlFrame?() ?? (currentControlFrame == nil ? controlFrame : nil) else {
+            failureReason = "Couldn’t Find The Menu Pocket Arrow"
+            return false
+        }
+        guard itemAccess.show(original, beside: arrow) else {
+            failureReason = itemAccess.failureReason
+            return false
+        }
+        var visibleFrame: CGRect?
+        var settledFrame: CGRect?
+        for _ in 0..<10 {
+            do { try await Task.sleep(for: .milliseconds(50)) } catch { return false }
+            guard !Task.isCancelled, panel === openingPanel else { return false }
+            guard !itemAccess.isMoving else { continue }
+            guard let current = frame(of: element), Self.isOnScreen(current, screens: NSScreen.screens.map(\.frame)) else { continue }
+            if current == visibleFrame {
+                settledFrame = current
+                break
+            }
+            visibleFrame = current
+        }
+        guard !Task.isCancelled, panel === openingPanel, let settledFrame,
+              let current = frame(of: element), current == settledFrame,
+              Self.isOnScreen(current, screens: NSScreen.screens.map(\.frame)) else {
+            failureReason = "Menu Icon Didn’t Move Into View"
+            NSLog("Menu Pocket: settling failed; original %@ final %@", NSStringFromRect(original),
+                  frame(of: element).map { NSStringFromRect($0) } ?? "unavailable")
+            return false
+        }
+
+        var owner: pid_t = 0
+        AXUIElementGetPid(element, &owner)
+        let before = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] ?? []
+        var error = AXUIElementPerformAction(element, kAXPressAction as CFString)
+        if error == .actionUnsupported {
+            error = AXUIElementPerformAction(element, kAXShowMenuAction as CFString)
+        }
+        // Some apps enter menu tracking before replying to AXPress. The reply
+        // times out even though their native menu is already on screen.
+        let after = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] ?? []
+        let menuOpened = error == .cannotComplete && Self.hasOpenedMenu(owner: owner, before: before, after: after)
+        if error == .success || menuOpened {
+            if menuOpened { NSLog("Menu Pocket: AX reply timed out after native menu opened") }
+            dismissRow()
+            return true
+        }
+        failureReason = "Couldn’t Open The Original Menu"
+        NSLog("Menu Pocket AX action result: %d", error.rawValue)
+        guard error == .actionUnsupported,
+              let down = CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown,
+                                 mouseCursorPosition: CGPoint(x: current.midX, y: current.midY), mouseButton: .left),
+              let up = CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp,
+                               mouseCursorPosition: CGPoint(x: current.midX, y: current.midY), mouseButton: .left) else { return false }
+        // Close our panel before delivering a normal click to the original icon.
+        dismissRow()
+        down.post(tap: .cghidEventTap)
+        up.post(tap: .cghidEventTap)
+        return true
+    }
+
+    static func hasOpenedMenu(owner: pid_t, before: [[String: Any]], after: [[String: Any]]) -> Bool {
+        guard owner > 0 else { return false }
+        let existing = Set(before.compactMap { $0[kCGWindowNumber as String] as? Int })
+        return after.contains { window in
+            guard let number = window[kCGWindowNumber as String] as? Int,
+                  !existing.contains(number),
+                  (window[kCGWindowOwnerPID as String] as? Int32) == owner,
+                  (window[kCGWindowLayer as String] as? Int) == Int(CGWindowLevelForKey(.popUpMenuWindow)),
+                  let bounds = window[kCGWindowBounds as String] as? [String: Any],
+                  let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return false }
+            return frame.width > 0 && frame.height > 0
+        }
+    }
+
+    static func isOnScreen(_ frame: CGRect, screens: [CGRect]) -> Bool {
+        // Accessibility uses a top-left origin; AppKit uses a bottom-left origin.
+        let top = screens.first?.maxY ?? 0
+        let cocoaFrame = CGRect(x: frame.minX, y: top - frame.maxY,
+                                width: frame.width, height: frame.height)
+        return frame.width > 4 && frame.height > 0 && screens.contains { $0.contains(cocoaFrame) }
     }
 
     private struct BarView: View {
         let items: [Item]
         let trusted: Bool
         let requestAccess: () -> Void
-        let open: (AXUIElement) -> Bool
+        let open: (AXUIElement) async -> Bool
+        let failureReason: () -> String?
         let close: () -> Void
         @State private var failedName: String?
+        @State private var isOpening = false
 
         var body: some View {
             HStack(spacing: 8) {
@@ -174,7 +319,13 @@ import SwiftUI
                         HStack(spacing: 4) {
                             ForEach(items) { item in
                                 Button {
-                                    if !open(item.element) { failedName = item.name }
+                                    isOpening = true
+                                    failedName = nil
+                                    Task {
+                                        let opened = await open(item.element)
+                                        if !opened { failedName = failureReason() ?? "Couldn’t Open \(item.name)" }
+                                        isOpening = false
+                                    }
                                 } label: {
                                     VStack(spacing: 4) {
                                         Image(nsImage: item.icon)
@@ -189,6 +340,7 @@ import SwiftUI
                                     .frame(width: 56, height: 56)
                                 }
                                 .buttonStyle(.plain)
+                                .disabled(isOpening)
                                 .help(item.name)
                                 .accessibilityLabel(item.name)
                             }
@@ -207,7 +359,7 @@ import SwiftUI
             .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
             .overlay(alignment: .bottom) {
                 if let failedName {
-                    Text("Couldn’t Open \(failedName)")
+                    Text(failedName)
                         .font(.system(size: 10))
                         .foregroundStyle(.red)
                         .padding(.bottom, 3)
@@ -216,3 +368,26 @@ import SwiftUI
         }
     }
 }
+
+#if DEBUG
+extension MenuPocketBar {
+    static func diagnose() {
+        print("Menu Pocket Accessibility:", AXIsProcessTrusted())
+        let bar = MenuPocketBar()
+        let windows = CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID) as? [[String: Any]] ?? []
+        for window in windows where (window[kCGWindowLayer as String] as? Int) == Int(CGWindowLevelForKey(.statusWindow)) {
+            print("Menu Pocket status window:", window[kCGWindowNumber as String] as Any,
+                  window[kCGWindowBounds as String] as Any)
+        }
+        for item in bar.groupedItems(before: .infinity) {
+            var actions: CFArray?
+            let result = AXUIElementCopyActionNames(item.element, &actions)
+            let itemFrame = bar.frame(of: item.element)
+            let match = itemFrame.flatMap { MenuPocketItemAccess().statusWindow(at: $0) }
+            print("Menu Pocket item:", item.name, "frame:", itemFrame as Any,
+                  "matched window:", match?[kCGWindowNumber as String] as Any,
+                  "actions:", actions as Any, "result:", result.rawValue)
+        }
+    }
+}
+#endif

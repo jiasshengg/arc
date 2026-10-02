@@ -72,14 +72,22 @@ To choose which icons to hide:
    **right of the line**.
 4. Click the arrow. The line and the icons on its left disappear.
 5. Click the arrow again to open a scrollable row below the menu bar. Select an
-   item there to open its original menu bar control. Click the arrow or × to
-   close the row.
+   item there to temporarily show just that icon and open its original control.
+   Click the arrow again to put it back and reopen the row. Click × to close
+   the row.
 
 The arrow points down when the row can be opened and up when it can be closed
 or the inline icons can be hidden.
 
-Your apps keep running while their icons are hidden. Arc doesn’t choose or move
-icons for you. Icons from newly opened apps may appear in the hidden group.
+To move an icon out of Menu Pocket, choose **Arrange Menu Pocket…**, then hold
+**Command** and drag its actual menu-bar icon to the **right of the line**.
+Use the actual menu bar to rearrange icons; dragging them in the popup row isn’t
+supported. Click the arrow when you’re finished arranging.
+
+Your apps keep running while their icons are hidden. You choose which icons
+belong in the group. Arc temporarily moves the selected icon to open its menu
+and returns it when you reopen the row. Icons from newly opened apps may appear
+in the hidden group.
 
 The setup line only appears while you’re arranging icons. Arc remembers whether
 Menu Pocket is on, and macOS manages the icon positions. When Arc starts with
@@ -116,9 +124,10 @@ Arc leaves volume and screen brightness messages to macOS.
 
 ## Privacy And Permissions
 
-Arc runs locally. Menu Pocket asks for Accessibility permission only to find
-and open hidden menu bar controls in its separate row. Arc doesn’t request
-Screen Recording, Notifications, Automation, or Input Monitoring permissions.
+Arc runs locally. Menu Pocket asks for Accessibility permission to find,
+temporarily move, and open hidden menu bar controls from its separate row. Arc
+doesn’t request Screen Recording, Notifications, Automation, or Input Monitoring
+permissions.
 Screenshot copying reads saved files; Arc doesn’t take pictures of your screen.
 File access may still need the usual macOS folder permission.
 
@@ -174,6 +183,8 @@ dist/Arc.app/Contents/MacOS/Arc --performance-check
 dist/Arc.app/Contents/MacOS/Arc --smoke-test
 # Test Menu Pocket’s buttons and layout with temporary menu bar items.
 dist/Arc.app/Contents/MacOS/Arc --menu-pocket-smoke-test
+# Inspect Menu Pocket’s Accessibility access and icon geometry without moving icons.
+dist/Arc.app/Contents/MacOS/Arc --menu-pocket-diagnose
 # Read the current battery status.
 dist/Arc.app/Contents/MacOS/Arc --system-smoke-test
 # Create sample images of the app for checking its appearance.
@@ -182,6 +193,9 @@ dist/Arc.app/Contents/MacOS/Arc --render-previews "$PWD/.build/previews"
 
 The extra command options above are available in debug builds only. Tests cover
 music details, playback progress, show/hide behavior, file handling, and layout.
+Menu Pocket checks also cover native event routing, cursor restoration decisions,
+and grouping after the divider moves. The native smoke check exercises Arc’s
+buttons and layout; it does not verify opening real third-party app menus.
 The sample images include playing, paused, empty, error, screenshot, and Pocket
 states.
 
@@ -190,6 +204,9 @@ states.
 - Tested locally on macOS 26. Running on macOS 14 and Intel Macs still needs testing.
 - More testing is needed with different music apps, full-screen apps, hidden
   menu bars, multiple screens, sleep/wake, Reduce Motion, and VoiceOver.
+- Menu Pocket’s menu opening, icon restoration, and pointer behavior still need
+  hands-on testing across third-party apps. Before a release, check opening and
+  closing menus repeatedly and confirm all grouped icons remain in the row.
 - Browser videos can appear as now playing. Arc doesn’t filter them out.
 - Timers, AirPods features, general notifications, and extra islands aren’t included.
 - Automatic updates and release packaging aren’t automated yet.
