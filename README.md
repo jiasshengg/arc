@@ -15,8 +15,8 @@ subscription, or usage tracking.
 - **Screenshot copying:** Copy newly saved screenshots to the clipboard automatically.
 - **Battery updates:** See brief charging and low-battery messages in the island.
 
-Arc is still an early version. See [Known Limits](#known-limits) before relying on
-it across different Macs and media apps.
+See [Known Limits](#known-limits) for compatibility and testing details across
+different Macs and media apps.
 
 ## Install
 
