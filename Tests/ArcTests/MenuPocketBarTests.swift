@@ -4,6 +4,24 @@ import XCTest
 @testable import Arc
 
 final class MenuPocketBarTests: XCTestCase {
+    func testPointerRestorationYieldsToMovementClicksAndScrolling() {
+        let point = CGPoint(x: 800, y: 300)
+        let counts: [UInt32] = Array(repeating: 10, count: 11)
+        let snapshot = MenuPocketPointerSnapshot(point: point, inputCounts: counts)
+        XCTAssertEqual(snapshot.restorePoint(inputCounts: counts), point)
+        for index in counts.indices {
+            var changed = counts
+            changed[index] += 1
+            XCTAssertNil(snapshot.restorePoint(inputCounts: changed),
+                         "New hardware input must prevent snapping to an old position")
+        }
+    }
+
+    func testPointerRestorationRejectsCounterWraparound() {
+        let snapshot = MenuPocketPointerSnapshot(point: .zero, inputCounts: [UInt32.max])
+        XCTAssertNil(snapshot.restorePoint(inputCounts: [0]))
+    }
+
     @MainActor func testMenuTimeoutRequiresANewMenuFromTheSelectedApp() {
         let menu = [kCGWindowNumber as String: 10, kCGWindowOwnerPID as String: Int32(20),
                     kCGWindowLayer as String: Int(CGWindowLevelForKey(.popUpMenuWindow)),
@@ -133,6 +151,28 @@ final class MenuPocketBarTests: XCTestCase {
         [kCGWindowNumber as String: number, kCGWindowOwnerPID as String: owner,
          kCGWindowLayer as String: Int(CGWindowLevelForKey(.statusWindow)),
          kCGWindowBounds as String: frame.dictionaryRepresentation]
+    }
+
+    @MainActor func testNativeMoveIncludesCommandDragBeforeRelease() throws {
+        let from = CGPoint(x: -3000, y: 16)
+        let to = CGPoint(x: 900, y: 16)
+        let events = try XCTUnwrap(MenuPocketItemAccess.dragEvents(window: 42, owner: 20,
+                                                                 from: from, to: to, targetWindow: 99))
+        XCTAssertEqual(events.map(\.type), [.leftMouseDown, .leftMouseDragged, .leftMouseUp])
+        XCTAssertEqual(events.map(\.location), [from, to, to])
+        XCTAssertTrue(events[1].flags.contains(.maskCommand))
+        XCTAssertEqual(NSEvent(cgEvent: events[1])?.windowNumber, 42)
+        XCTAssertEqual(NSEvent(cgEvent: events[2])?.windowNumber, 99)
+        XCTAssertFalse(events[2].flags.contains(.maskCommand))
+        let sourceID = try XCTUnwrap(CGEventSource(event: events[0])).sourceStateID
+        for event in events {
+            let source = try XCTUnwrap(CGEventSource(event: event))
+            XCTAssertEqual(source.sourceStateID, sourceID)
+            XCTAssertNotEqual(source.sourceStateID, .hidSystemState)
+            XCTAssertNotEqual(source.sourceStateID, .combinedSessionState)
+            XCTAssertEqual(source.localEventsSuppressionInterval, 0)
+            XCTAssertEqual(source.getLocalEventsFilterDuringSuppressionState(.eventSuppressionStateRemoteMouseDrag), [.permitLocalMouseEvents, .permitLocalKeyboardEvents, .permitSystemDefinedEvents])
+        }
     }
 
     @MainActor func testStatusItemEventsTargetOneWindow() throws {

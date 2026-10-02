@@ -21,6 +21,7 @@ import ApplicationServices
     }
     private let windows: () -> [[String: Any]]
     private let move: ((Int, pid_t, CGPoint, CGPoint, Int?) -> Bool)?
+    var isMoving: Bool { delivery.isBusy || delivery.isRestoringPointer }
     var hasPendingItem: Bool { placement != nil }
 
     init(windows: @escaping () -> [[String: Any]] = {
@@ -79,7 +80,7 @@ import ApplicationServices
 
     @discardableResult func restore() -> Bool {
         guard let placement else { return false }
-        if delivery.isBusy { delivery.cancel() }
+        if isMoving { return true }
         guard let window = windows().first(where: {
             ($0[kCGWindowNumber as String] as? Int) == placement.window
                 && ($0[kCGWindowOwnerPID as String] as? Int32) == placement.owner
@@ -135,21 +136,44 @@ import ApplicationServices
 
     private func drag(window: Int, owner: pid_t, from: CGPoint, to: CGPoint, targetWindow: Int? = nil) -> Bool {
         if let move { return move(window, owner, from, to, targetWindow) }
-        guard AXIsProcessTrusted(),
-              let down = Self.event(.leftMouseDown, window: window, at: from, command: true, owner: owner),
-              let up = Self.event(.leftMouseUp, window: targetWindow ?? window, at: to, command: false, owner: owner) else { return false }
-        guard let release = Self.event(.leftMouseUp, window: window, at: from,
-                                       command: false, owner: owner) else { return false }
-        return delivery.send([down, up], owner: owner, release: release)
+        guard AXIsProcessTrusted(), let source = CGEventSource(stateID: .privateState),
+              let events = Self.dragEvents(window: window, owner: owner, from: from,
+                                           to: to, targetWindow: targetWindow, source: source),
+              let release = Self.event(.leftMouseUp, window: window, at: from,
+                                       command: false, owner: owner, source: source) else { return false }
+        return delivery.send(events, owner: owner, release: release) { [weak self] in
+            guard let window = self?.windows().first(where: {
+                ($0[kCGWindowNumber as String] as? Int) == window
+                    && ($0[kCGWindowOwnerPID as String] as? Int32) == owner
+            }), let bounds = window[kCGWindowBounds as String] as? [String: Any],
+               let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return false }
+            return abs(frame.midX - from.x) > 2 || abs(frame.midY - from.y) > 2
+        }
     }
 
-    static func event(_ type: NSEvent.EventType, window: Int, at point: CGPoint, command: Bool, owner: pid_t = 0) -> CGEvent? {
+    static func dragEvents(window: Int, owner: pid_t, from: CGPoint, to: CGPoint,
+                           targetWindow: Int?, source: CGEventSource? = nil) -> [CGEvent]? {
+        guard let source = source ?? CGEventSource(stateID: .privateState) else { return nil }
+        guard let down = event(.leftMouseDown, window: window, at: from, command: true, owner: owner, source: source),
+              let dragged = event(.leftMouseDragged, window: window, at: to, command: true, owner: owner, source: source),
+              let up = event(.leftMouseUp, window: targetWindow ?? window, at: to, command: false, owner: owner, source: source) else { return nil }
+        return [down, dragged, up]
+    }
+
+    static func event(_ type: NSEvent.EventType, window: Int, at point: CGPoint, command: Bool, owner: pid_t = 0, source: CGEventSource? = nil) -> CGEvent? {
         // AppKit supplies the native window number through its public event API.
         guard let event = NSEvent.mouseEvent(with: type, location: .zero,
                                              modifierFlags: command ? .command : [],
                                              timestamp: ProcessInfo.processInfo.systemUptime,
                                              windowNumber: window, context: nil,
                                              eventNumber: 0, clickCount: 1, pressure: 1)?.cgEvent else { return nil }
+        // A private source keeps generated mouse state out of hardware input
+        // counters and avoids suppressing the user's mouse after each post.
+        guard let source = source ?? CGEventSource(stateID: .privateState) else { return nil }
+        source.localEventsSuppressionInterval = 0
+        source.setLocalEventsFilterDuringSuppressionState([.permitLocalMouseEvents, .permitLocalKeyboardEvents, .permitSystemDefinedEvents], state: .eventSuppressionStateRemoteMouseDrag)
+        source.setLocalEventsFilterDuringSuppressionState([.permitLocalMouseEvents, .permitLocalKeyboardEvents, .permitSystemDefinedEvents], state: .eventSuppressionStateSuppressionInterval)
+        event.setSource(source)
         event.location = point
         event.setIntegerValueField(.eventTargetUnixProcessID, value: Int64(owner))
         event.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: Int64(window))

@@ -13,22 +13,31 @@ import ApplicationServices
     private var timeout: Task<Void, Never>?
     private var marker: Int64 = 0
     private var release: CGEvent?
-    private var savedPointer: CGPoint?
+    private var didMove: (() -> Bool)?
+    private var savedPointer: MenuPocketPointerSnapshot?
     private var pointerHidden = false
     private var pointerTask: Task<Void, Never>?
+    var isRestoringPointer: Bool { pointerTask != nil }
     var isBusy: Bool { !events.isEmpty }
 
-    func send(_ events: [CGEvent], owner: pid_t, release: CGEvent) -> Bool {
+    func send(_ events: [CGEvent], owner: pid_t, release: CGEvent, didMove: @escaping () -> Bool) -> Bool {
         guard !isBusy, !events.isEmpty else { return false }
         // A previous delayed cleanup must not warp over a new user click.
         pointerTask?.cancel()
         pointerTask = nil
-        if pointerHidden { NSCursor.unhide(); pointerHidden = false }
-        savedPointer = CGEvent(source: nil)?.location
-        if savedPointer != nil { NSCursor.hide(); pointerHidden = true }
+        if pointerHidden { CGDisplayShowCursor(CGMainDisplayID()); pointerHidden = false }
+        savedPointer = CGEvent(source: nil).map {
+            MenuPocketPointerSnapshot(point: $0.location, inputCounts: MenuPocketPointerSnapshot.hardwareInputCounts())
+        }
+        if savedPointer != nil {
+            let result = CGDisplayHideCursor(CGMainDisplayID())
+            pointerHidden = result == .success
+            if !pointerHidden { NSLog("Menu Pocket: cursor hide failed: %d", result.rawValue) }
+        }
         self.events = events
         self.owner = owner
         self.release = release
+        self.didMove = didMove
         return beginEvent()
     }
 
@@ -38,27 +47,35 @@ import ApplicationServices
         events.removeAll()
         if wasBusy { release?.post(tap: .cgSessionEventTap) }
         release = nil
+        didMove = nil
         restorePointer(immediately: true)
     }
 
     private func restorePointer(immediately: Bool) {
         pointerTask?.cancel()
         pointerTask = nil
-        guard let point = savedPointer else { return }
+        guard savedPointer != nil else { return }
         if immediately {
-            CGWarpMouseCursorPosition(point)
-            savedPointer = nil
-            if pointerHidden { NSCursor.unhide(); pointerHidden = false }
+            finishPointerRestoration()
             return
         }
         // The owner can still handle the forwarded mouse-up after receipt.
         pointerTask = Task { [self] in
             do { try await Task.sleep(for: .milliseconds(50)) } catch { return }
-            CGWarpMouseCursorPosition(point)
-            savedPointer = nil
-            pointerTask = nil
-            if pointerHidden { NSCursor.unhide(); pointerHidden = false }
+            finishPointerRestoration()
         }
+    }
+
+    private func finishPointerRestoration() {
+        if let point = savedPointer?.restorePoint(inputCounts: MenuPocketPointerSnapshot.hardwareInputCounts()) {
+            let result = CGWarpMouseCursorPosition(point)
+            NSLog("Menu Pocket: cursor restored: %d", result.rawValue)
+        } else {
+            NSLog("Menu Pocket: cursor restoration skipped after hardware input")
+        }
+        savedPointer = nil
+        pointerTask = nil
+        if pointerHidden { CGDisplayShowCursor(CGMainDisplayID()); pointerHidden = false }
     }
 
     private func beginEvent() -> Bool {
@@ -116,12 +133,22 @@ import ApplicationServices
         events.removeFirst()
         if events.isEmpty {
             release = nil
+            didMove = nil
             restorePointer(immediately: false)
             NSLog("Menu Pocket: native move events delivered")
         } else {
             timeout = Task { [weak self] in
                 do { try await Task.sleep(for: .milliseconds(30)) } catch { return }
                 guard let self, self.isBusy else { return }
+                // A receipt only confirms routing. Give the native drag time
+                // to move its window before releasing the button.
+                if next.type == .leftMouseDragged {
+                    for _ in 0..<10 {
+                        if self.didMove?() == true { break }
+                        do { try await Task.sleep(for: .milliseconds(20)) } catch { return }
+                    }
+                    NSLog("Menu Pocket: native drag changed window: %@", self.didMove?() == true ? "yes" : "no")
+                }
                 _ = self.beginEvent()
             }
         }
@@ -146,5 +173,23 @@ import ApplicationServices
         let delivery = Unmanaged<MenuPocketEventDelivery>.fromOpaque(context).takeUnretainedValue()
         let consume = MainActor.assumeIsolated { delivery.received(event) }
         return consume ? nil : Unmanaged.passUnretained(event)
+    }
+}
+
+/// Only restore synthetic cursor movement; subsequent physical input wins.
+struct MenuPocketPointerSnapshot {
+    let point: CGPoint
+    let inputCounts: [UInt32]
+
+    func restorePoint(inputCounts current: [UInt32]) -> CGPoint? {
+        current == inputCounts ? point : nil
+    }
+
+    static func hardwareInputCounts() -> [UInt32] {
+        let types: [CGEventType] = [.mouseMoved, .leftMouseDragged, .rightMouseDragged,
+                                    .otherMouseDragged, .leftMouseDown, .leftMouseUp,
+                                    .rightMouseDown, .rightMouseUp, .otherMouseDown,
+                                    .otherMouseUp, .scrollWheel]
+        return types.map { CGEventSource.counterForEventType(.hidSystemState, eventType: $0) }
     }
 }

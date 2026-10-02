@@ -181,12 +181,6 @@ import SwiftUI
             return false
         }
         guard let openingPanel = panel else { return false }
-        let pointer = CGEvent(source: nil)?.location
-        if pointer != nil { NSCursor.hide() }
-        defer {
-            // AX menu opening can handle a forwarded mouse event after the move.
-            if let pointer { CGWarpMouseCursorPosition(pointer); NSCursor.unhide() }
-        }
         openingPanel.orderOut(nil)
         onVisibilityChanged?()
         defer {
@@ -219,6 +213,7 @@ import SwiftUI
         for _ in 0..<10 {
             do { try await Task.sleep(for: .milliseconds(50)) } catch { return false }
             guard !Task.isCancelled, panel === openingPanel else { return false }
+            guard !itemAccess.isMoving else { continue }
             guard let current = frame(of: element), Self.isOnScreen(current, screens: NSScreen.screens.map(\.frame)) else { continue }
             if current == visibleFrame {
                 settledFrame = current
