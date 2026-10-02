@@ -4,6 +4,23 @@ import XCTest
 @testable import Arc
 
 final class MenuPocketBarTests: XCTestCase {
+    @MainActor func testGroupingUsesLiveDividerAfterAnotherIconReturns() {
+        let bar = MenuPocketBar()
+        let beforeRestore = CGRect(x: -4100, y: 0, width: 5000, height: 33)
+        var liveDivider = beforeRestore
+        bar.currentDividerFrame = { liveDivider }
+        // Returning Teams shifts the boundary right past the unchanged Glide
+        // frame. The pre-restoration boundary would incorrectly omit Glide.
+        let glide = CGRect(x: -4084, y: 4.5, width: 24, height: 24)
+        liveDivider.origin.x += 37
+        XCTAssertLessThan(glide.minX, bar.groupingBoundary(before: beforeRestore))
+        XCTAssertGreaterThan(glide.minX, beforeRestore.minX)
+        liveDivider.origin.x -= 50
+        XCTAssertEqual(bar.groupingBoundary(before: beforeRestore), liveDivider.minX)
+        bar.currentDividerFrame = { nil }
+        XCTAssertEqual(bar.groupingBoundary(before: beforeRestore), beforeRestore.minX)
+    }
+
     func testPointerRestorationYieldsToMovementClicksAndScrolling() {
         let point = CGPoint(x: 800, y: 300)
         let counts: [UInt32] = Array(repeating: 10, count: 11)

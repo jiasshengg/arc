@@ -17,6 +17,7 @@ import SwiftUI
     private var presentationTask: Task<Void, Never>?
     var onVisibilityChanged: (() -> Void)?
     var currentControlFrame: (() -> CGRect?)?
+    var currentDividerFrame: (() -> CGRect?)?
     private let itemAccess = MenuPocketItemAccess()
     private var controlFrame = CGRect.zero
     private var failureReason: String?
@@ -33,8 +34,16 @@ import SwiftUI
             return
         }
         presentationTask = Task { [weak self] in
-            do { try await Task.sleep(for: .milliseconds(150)) } catch { return }
             guard let self else { return }
+            var previousBoundary: CGFloat?
+            for _ in 0..<20 {
+                do { try await Task.sleep(for: .milliseconds(50)) } catch { return }
+                guard !self.itemAccess.isMoving else { previousBoundary = nil; continue }
+                let boundary = self.groupingBoundary(before: dividerFrame)
+                if boundary == previousBoundary { break }
+                previousBoundary = boundary
+            }
+            guard !Task.isCancelled else { return }
             self.presentationTask = nil
             self.show(beside: controlFrame, before: dividerFrame)
         }
@@ -56,11 +65,15 @@ import SwiftUI
         onVisibilityChanged?()
     }
 
+    func groupingBoundary(before fallback: CGRect) -> CGFloat {
+        (currentDividerFrame?() ?? fallback).minX
+    }
+
     private func show(beside controlFrame: CGRect, before dividerFrame: CGRect) {
         let controlFrame = currentControlFrame?() ?? controlFrame
         self.controlFrame = controlFrame
         let trusted = AXIsProcessTrusted()
-        let items = trusted ? groupedItems(before: dividerFrame.minX) : []
+        let items = trusted ? groupedItems(before: groupingBoundary(before: dividerFrame)) : []
         let screen = NSScreen.screens.first { $0.frame.intersects(controlFrame) } ?? NSScreen.main
         guard let screen else { return }
 

@@ -34,6 +34,7 @@ import Combine
         self.itemPrefix = itemPrefix
         super.init()
         bar.currentControlFrame = { [weak self] in self?.chevronFrame }
+        bar.currentDividerFrame = { [weak self] in self?.spacer?.button?.window?.frame }
         bar.onVisibilityChanged = { [weak self] in
             guard let self else { return }
             self.isBarOpen = self.bar.isVisible
