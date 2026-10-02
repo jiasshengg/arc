@@ -9,6 +9,13 @@ import ApplicationServices
         let original: CGRect
     }
     private var placement: Placement?
+    private(set) var failureReason: String?
+
+    private func fail(_ reason: String) -> Bool {
+        failureReason = reason
+        NSLog("Menu Pocket: %@", reason)
+        return false
+    }
     private let windows: () -> [[String: Any]]
     private let move: ((Int, pid_t, CGPoint, CGPoint, Int?) -> Bool)?
     var hasPendingItem: Bool { placement != nil }
@@ -21,20 +28,34 @@ import ApplicationServices
     }
 
     func show(_ frame: CGRect, beside control: CGRect) -> Bool {
+        failureReason = nil
+        guard AXIsProcessTrusted() || move != nil else { return fail("Allow Accessibility To Open Menu Icons") }
         _ = restore()
-        guard !hasPendingItem, let window = statusWindow(at: frame),
-              let number = window[kCGWindowNumber as String] as? Int,
+        guard !hasPendingItem else { return fail("Previous Menu Icon Has Not Returned") }
+        guard let window = statusWindow(at: frame) else {
+            NSLog("Menu Pocket missing source window for AX frame %@", NSStringFromRect(frame))
+            return fail("Couldn’t Find The Original Menu Icon")
+        }
+        guard
+            let number = window[kCGWindowNumber as String] as? Int,
               let owner = window[kCGWindowOwnerPID as String] as? Int32,
               let bounds = window[kCGWindowBounds as String] as? [String: Any],
-              let windowFrame = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return false }
+              let windowFrame = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return fail("Couldn’t Read The Original Menu Icon") }
         let original = CGPoint(x: windowFrame.midX, y: windowFrame.midY)
         // Drop on the arrow's left edge, on the visible side of the spacer.
         let top = NSScreen.screens.first?.frame.maxY ?? 0
         let destination = CGPoint(x: control.minX + 1, y: top - control.midY)
         let destinationFrame = CGRect(x: control.minX, y: top - control.maxY,
                                       width: control.width, height: control.height)
-        guard let target = statusWindow(at: destinationFrame)?[kCGWindowNumber as String] as? Int,
-              drag(window: number, owner: owner, from: original, to: destination, targetWindow: target) else { return false }
+        guard let target = statusWindow(at: destinationFrame)?[kCGWindowNumber as String] as? Int else {
+            NSLog("Menu Pocket missing arrow window for frame %@", NSStringFromRect(destinationFrame))
+            return fail("Couldn’t Find The Menu Pocket Arrow")
+        }
+        guard drag(window: number, owner: owner, from: original, to: destination, targetWindow: target) else {
+            return fail("Couldn’t Send The Menu Icon Move")
+        }
+        NSLog("Menu Pocket move posted: window %d owner %d from %@ to %@", number, owner,
+              NSStringFromPoint(original), NSStringFromPoint(destination))
         placement = Placement(window: number, owner: owner, original: windowFrame)
         return true
     }

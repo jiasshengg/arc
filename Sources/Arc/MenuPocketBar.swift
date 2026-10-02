@@ -18,6 +18,7 @@ import SwiftUI
     var onVisibilityChanged: (() -> Void)?
     private let itemAccess = MenuPocketItemAccess()
     private var controlFrame = CGRect.zero
+    private var failureReason: String?
     var isVisible: Bool { panel?.isVisible == true }
 
     func toggle(beside controlFrame: CGRect, before dividerFrame: CGRect) {
@@ -76,7 +77,8 @@ import SwiftUI
         bar.isFloatingPanel = true
         bar.contentView = NSHostingView(rootView: BarView(items: items, trusted: trusted,
                                                          requestAccess: requestAccess,
-                                                         open: open, close: close))
+                                                         open: open, failureReason: { [weak self] in self?.failureReason },
+                                                         close: close))
         panel = bar
         bar.orderFrontRegardless()
         onVisibilityChanged?()
@@ -170,6 +172,12 @@ import SwiftUI
     private func open(_ element: AXUIElement) async -> Bool {
         // A hidden status item can accept AXPress without presenting a usable
         // menu. Move only this item into view before opening its control.
+        failureReason = nil
+        guard AXIsProcessTrusted() else {
+            failureReason = "Allow Accessibility To Open Menu Icons"
+            NSLog("Menu Pocket: Accessibility access missing at click")
+            return false
+        }
         guard let openingPanel = panel else { return false }
         openingPanel.orderOut(nil)
         onVisibilityChanged?()
@@ -181,7 +189,15 @@ import SwiftUI
                 onVisibilityChanged?()
             }
         }
-        guard let original = frame(of: element), itemAccess.show(original, beside: controlFrame) else { return false }
+        guard let original = frame(of: element) else {
+            failureReason = "Couldn’t Read The Original Menu Icon"
+            NSLog("Menu Pocket: AX frame read failed")
+            return false
+        }
+        guard itemAccess.show(original, beside: controlFrame) else {
+            failureReason = itemAccess.failureReason
+            return false
+        }
         var visibleFrame: CGRect?
         var settledFrame: CGRect?
         for _ in 0..<10 {
@@ -196,7 +212,12 @@ import SwiftUI
         }
         guard !Task.isCancelled, panel === openingPanel, let settledFrame,
               let current = frame(of: element), current == settledFrame,
-              Self.isOnScreen(current, screens: NSScreen.screens.map(\.frame)) else { return false }
+              Self.isOnScreen(current, screens: NSScreen.screens.map(\.frame)) else {
+            failureReason = "Menu Icon Didn’t Move Into View"
+            NSLog("Menu Pocket: settling failed; original %@ final %@", NSStringFromRect(original),
+                  frame(of: element).map { NSStringFromRect($0) } ?? "unavailable")
+            return false
+        }
 
         var error = AXUIElementPerformAction(element, kAXPressAction as CFString)
         if error == .actionUnsupported {
@@ -206,6 +227,8 @@ import SwiftUI
             dismissRow()
             return true
         }
+        failureReason = "Couldn’t Open The Original Menu"
+        NSLog("Menu Pocket AX action result: %d", error.rawValue)
         guard error == .actionUnsupported,
               let down = CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown,
                                  mouseCursorPosition: CGPoint(x: current.midX, y: current.midY), mouseButton: .left),
@@ -231,6 +254,7 @@ import SwiftUI
         let trusted: Bool
         let requestAccess: () -> Void
         let open: (AXUIElement) async -> Bool
+        let failureReason: () -> String?
         let close: () -> Void
         @State private var failedName: String?
         @State private var isOpening = false
@@ -253,7 +277,7 @@ import SwiftUI
                                     failedName = nil
                                     Task {
                                         let opened = await open(item.element)
-                                        if !opened { failedName = item.name }
+                                        if !opened { failedName = failureReason() ?? "Couldn’t Open \(item.name)" }
                                         isOpening = false
                                     }
                                 } label: {
@@ -289,7 +313,7 @@ import SwiftUI
             .background(Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
             .overlay(alignment: .bottom) {
                 if let failedName {
-                    Text("Couldn’t Open \(failedName)")
+                    Text(failedName)
                         .font(.system(size: 10))
                         .foregroundStyle(.red)
                         .padding(.bottom, 3)
