@@ -4,6 +4,44 @@ import XCTest
 @testable import Arc
 
 final class MenuPocketBarTests: XCTestCase {
+    @MainActor func testMenuTimeoutRequiresANewMenuFromTheSelectedApp() {
+        let menu = [kCGWindowNumber as String: 10, kCGWindowOwnerPID as String: Int32(20),
+                    kCGWindowLayer as String: Int(CGWindowLevelForKey(.popUpMenuWindow)),
+                    kCGWindowBounds as String: CGRect(x: 900, y: 24, width: 200, height: 150).dictionaryRepresentation] as [String: Any]
+        XCTAssertTrue(MenuPocketBar.hasOpenedMenu(owner: 20, before: [], after: [menu]))
+        XCTAssertFalse(MenuPocketBar.hasOpenedMenu(owner: 21, before: [], after: [menu]))
+        XCTAssertFalse(MenuPocketBar.hasOpenedMenu(owner: 20, before: [menu], after: [menu]))
+        XCTAssertFalse(MenuPocketBar.hasOpenedMenu(owner: 20, before: [], after: []))
+        var ordinaryWindow = menu
+        ordinaryWindow[kCGWindowLayer as String] = 0
+        XCTAssertFalse(MenuPocketBar.hasOpenedMenu(owner: 20, before: [], after: [ordinaryWindow]))
+    }
+
+    @MainActor func testRestorationTargetsOriginalNeighborAfterGroupRelayout() {
+        let original = CGRect(x: -3000, y: 0, width: 24, height: 24)
+        let control = CGRect(x: 900, y: (NSScreen.screens.first?.frame.maxY ?? 0) - 24,
+                             width: 18, height: 24)
+        var itemFrame = original
+        var neighborFrame = CGRect(x: -2976, y: 0, width: 24, height: 24)
+        var destination: CGPoint?
+        var target: Int?
+        let access = MenuPocketItemAccess(windows: {
+            [self.window(1, owner: 20, frame: itemFrame),
+             self.window(3, owner: 20, frame: neighborFrame),
+             self.window(2, owner: 20, frame: CGRect(x: 900, y: 0, width: 18, height: 24))]
+        }, move: { _, _, _, point, window in destination = point; target = window; return true })
+        XCTAssertTrue(access.show(original, beside: control))
+        itemFrame = CGRect(x: 876, y: 0, width: 24, height: 24)
+        neighborFrame.origin.x -= 37
+        XCTAssertTrue(access.restore())
+        XCTAssertEqual(target, 3)
+        XCTAssertEqual(destination, CGPoint(x: neighborFrame.minX + 1, y: neighborFrame.midY))
+        XCTAssertTrue(access.hasPendingItem)
+        itemFrame.origin.x = neighborFrame.minX - itemFrame.width
+        XCTAssertFalse(access.restore())
+        XCTAssertFalse(access.hasPendingItem)
+    }
+
     @MainActor func testArrowProxyMatchesInsetHostingWindow() {
         let original = CGRect(x: -3000, y: 0, width: 34, height: 33)
         let control = CGRect(x: 900, y: (NSScreen.screens.first?.frame.maxY ?? 0) - 33,

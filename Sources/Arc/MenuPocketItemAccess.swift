@@ -7,6 +7,8 @@ import ApplicationServices
         let window: Int
         let owner: pid_t
         let original: CGRect
+        let neighbor: Int?
+        let gap: CGFloat
     }
     private var placement: Placement?
     private let delivery = MenuPocketEventDelivery()
@@ -43,6 +45,18 @@ import ApplicationServices
               let bounds = window[kCGWindowBounds as String] as? [String: Any],
               let windowFrame = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return fail("Couldn’t Read The Original Menu Icon") }
         let original = CGPoint(x: windowFrame.midX, y: windowFrame.midY)
+        // Native ordering is relative to another status window. Absolute hidden
+        // coordinates change when other items enter or leave the group.
+        let neighbor = windows().first { candidate in
+            guard (candidate[kCGWindowOwnerPID as String] as? Int32) == owner,
+                  (candidate[kCGWindowLayer as String] as? Int) == Int(CGWindowLevelForKey(.statusWindow)),
+                  let bounds = candidate[kCGWindowBounds as String] as? [String: Any],
+                  let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return false }
+            return abs(frame.midY - windowFrame.midY) < 2
+                && frame.minX >= windowFrame.maxX - 2 && frame.minX <= windowFrame.maxX + 8
+        }
+        let neighborFrame = (neighbor?[kCGWindowBounds as String] as? [String: Any])
+            .flatMap { CGRect(dictionaryRepresentation: $0 as CFDictionary) }
         // Drop on the arrow's left edge, on the visible side of the spacer.
         let top = NSScreen.screens.first?.frame.maxY ?? 0
         let destination = CGPoint(x: control.minX + 1, y: top - control.midY)
@@ -57,7 +71,9 @@ import ApplicationServices
         }
         NSLog("Menu Pocket move posted: window %d owner %d from %@ to %@", number, owner,
               NSStringFromPoint(original), NSStringFromPoint(destination))
-        placement = Placement(window: number, owner: owner, original: windowFrame)
+        placement = Placement(window: number, owner: owner, original: windowFrame,
+                              neighbor: neighbor?[kCGWindowNumber as String] as? Int,
+                              gap: (neighborFrame?.minX ?? windowFrame.maxX) - windowFrame.maxX)
         return true
     }
 
@@ -74,7 +90,16 @@ import ApplicationServices
         }
         guard let bounds = window[kCGWindowBounds as String] as? [String: Any],
               let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return false }
-        if Self.matches(frame, placement.original) {
+        let neighbor = windows().first {
+            ($0[kCGWindowNumber as String] as? Int) == placement.neighbor
+                && ($0[kCGWindowOwnerPID as String] as? Int32) == placement.owner
+        }
+        let neighborFrame = (neighbor?[kCGWindowBounds as String] as? [String: Any])
+            .flatMap { CGRect(dictionaryRepresentation: $0 as CFDictionary) }
+        let returned = neighborFrame.map {
+            abs(frame.maxX + placement.gap - $0.minX) < 2 && abs(frame.midY - $0.midY) < 2
+        } ?? Self.matches(frame, placement.original)
+        if returned {
             self.placement = nil
             return false
         }
@@ -82,7 +107,9 @@ import ApplicationServices
         // Posting events can succeed even if macOS ignores the move.
         return drag(window: placement.window, owner: placement.owner,
                     from: CGPoint(x: frame.midX, y: frame.midY),
-                    to: CGPoint(x: placement.original.midX, y: placement.original.midY))
+                    to: neighborFrame.map { CGPoint(x: $0.minX + 1, y: $0.midY) }
+                        ?? CGPoint(x: placement.original.midX, y: placement.original.midY),
+                    targetWindow: neighbor?[kCGWindowNumber as String] as? Int)
     }
 
     func statusWindow(at frame: CGRect) -> [String: Any]? {

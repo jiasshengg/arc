@@ -57,6 +57,7 @@ import SwiftUI
     }
 
     private func show(beside controlFrame: CGRect, before dividerFrame: CGRect) {
+        let controlFrame = currentControlFrame?() ?? controlFrame
         self.controlFrame = controlFrame
         let trusted = AXIsProcessTrusted()
         let items = trusted ? groupedItems(before: dividerFrame.minX) : []
@@ -234,11 +235,19 @@ import SwiftUI
             return false
         }
 
+        var owner: pid_t = 0
+        AXUIElementGetPid(element, &owner)
+        let before = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] ?? []
         var error = AXUIElementPerformAction(element, kAXPressAction as CFString)
         if error == .actionUnsupported {
             error = AXUIElementPerformAction(element, kAXShowMenuAction as CFString)
         }
-        if error == .success {
+        // Some apps enter menu tracking before replying to AXPress. The reply
+        // times out even though their native menu is already on screen.
+        let after = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] ?? []
+        let menuOpened = error == .cannotComplete && Self.hasOpenedMenu(owner: owner, before: before, after: after)
+        if error == .success || menuOpened {
+            if menuOpened { NSLog("Menu Pocket: AX reply timed out after native menu opened") }
             dismissRow()
             return true
         }
@@ -254,6 +263,20 @@ import SwiftUI
         down.post(tap: .cghidEventTap)
         up.post(tap: .cghidEventTap)
         return true
+    }
+
+    static func hasOpenedMenu(owner: pid_t, before: [[String: Any]], after: [[String: Any]]) -> Bool {
+        guard owner > 0 else { return false }
+        let existing = Set(before.compactMap { $0[kCGWindowNumber as String] as? Int })
+        return after.contains { window in
+            guard let number = window[kCGWindowNumber as String] as? Int,
+                  !existing.contains(number),
+                  (window[kCGWindowOwnerPID as String] as? Int32) == owner,
+                  (window[kCGWindowLayer as String] as? Int) == Int(CGWindowLevelForKey(.popUpMenuWindow)),
+                  let bounds = window[kCGWindowBounds as String] as? [String: Any],
+                  let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return false }
+            return frame.width > 0 && frame.height > 0
+        }
     }
 
     static func isOnScreen(_ frame: CGRect, screens: [CGRect]) -> Bool {
