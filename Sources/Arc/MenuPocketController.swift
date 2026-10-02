@@ -226,17 +226,21 @@ extension MenuPocketController {
                   controller.spacer?.button?.window?.frame as Any)
             return false
         }
-        let top = NSScreen.screens.first?.frame.maxY ?? 0
-        let targetFrame = CGRect(x: control.minX, y: top - control.maxY,
-                                 width: control.width, height: control.height)
-        guard MenuPocketItemAccess().statusWindow(at: targetFrame) != nil else {
-            print("Menu Pocket native arrow lookup failed:", targetFrame,
-                  "proxy window:", button.window?.windowNumber as Any)
-            for window in CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID) as? [[String: Any]] ?? []
-                where (window[kCGWindowLayer as String] as? Int) == Int(CGWindowLevelForKey(.statusWindow)) {
-                print("Status window:", window[kCGWindowNumber as String] as Any,
-                      window[kCGWindowBounds as String] as Any)
+        // The remote menu-bar host can finish laying out after the proxy.
+        var arrowFound = false
+        for _ in 0..<10 {
+            try? await Task.sleep(for: .milliseconds(50))
+            guard let current = controller.chevronFrame else { continue }
+            let top = NSScreen.screens.first?.frame.maxY ?? 0
+            let targetFrame = CGRect(x: current.minX, y: top - current.maxY,
+                                     width: current.width, height: current.height)
+            if MenuPocketItemAccess().statusWindow(at: targetFrame) != nil {
+                arrowFound = true
+                break
             }
+        }
+        guard arrowFound else {
+            print("Menu Pocket native arrow lookup failed:", controller.chevronFrame as Any)
             return false
         }
         for _ in 0..<3 {

@@ -180,6 +180,12 @@ import SwiftUI
             return false
         }
         guard let openingPanel = panel else { return false }
+        let pointer = CGEvent(source: nil)?.location
+        if pointer != nil { NSCursor.hide() }
+        defer {
+            // AX menu opening can handle a forwarded mouse event after the move.
+            if let pointer { CGWarpMouseCursorPosition(pointer); NSCursor.unhide() }
+        }
         openingPanel.orderOut(nil)
         onVisibilityChanged?()
         defer {

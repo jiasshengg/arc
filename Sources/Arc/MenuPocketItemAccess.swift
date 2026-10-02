@@ -9,6 +9,7 @@ import ApplicationServices
         let original: CGRect
     }
     private var placement: Placement?
+    private let delivery = MenuPocketEventDelivery()
     private(set) var failureReason: String?
 
     private func fail(_ reason: String) -> Bool {
@@ -62,6 +63,7 @@ import ApplicationServices
 
     @discardableResult func restore() -> Bool {
         guard let placement else { return false }
+        if delivery.isBusy { delivery.cancel() }
         guard let window = windows().first(where: {
             ($0[kCGWindowNumber as String] as? Int) == placement.window
                 && ($0[kCGWindowOwnerPID as String] as? Int32) == placement.owner
@@ -109,11 +111,9 @@ import ApplicationServices
         guard AXIsProcessTrusted(),
               let down = Self.event(.leftMouseDown, window: window, at: from, command: true, owner: owner),
               let up = Self.event(.leftMouseUp, window: targetWindow ?? window, at: to, command: false, owner: owner) else { return false }
-        let pointer = CGEvent(source: nil)?.location
-        down.postToPid(owner)
-        up.post(tap: .cgSessionEventTap)
-        if let pointer { CGWarpMouseCursorPosition(pointer) }
-        return true
+        guard let release = Self.event(.leftMouseUp, window: window, at: from,
+                                       command: false, owner: owner) else { return false }
+        return delivery.send([down, up], owner: owner, release: release)
     }
 
     static func event(_ type: NSEvent.EventType, window: Int, at point: CGPoint, command: Bool, owner: pid_t = 0) -> CGEvent? {
