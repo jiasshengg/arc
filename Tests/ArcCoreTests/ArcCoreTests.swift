@@ -42,6 +42,21 @@ final class ArcCoreTests: XCTestCase {
         XCTAssertEqual(track.position(at: epoch.addingTimeInterval(-10)), 30)
     }
 
+    func testBrowserMediaIsRecognizedBySourceOrParentApp() throws {
+        for browser in ["com.apple.Safari", "com.google.Chrome", "com.google.Chrome.canary",
+                        "org.mozilla.firefox", "com.microsoft.edgemac", "company.thebrowser.Browser"] {
+            XCTAssertTrue(NowPlayingSnapshot(title: "Video", sourceBundleIdentifier: browser).isFromBrowser, browser)
+        }
+        for player in ["com.spotify.client", "com.apple.Music", "com.google.Chromecast", ""] {
+            XCTAssertFalse(NowPlayingSnapshot(title: "Track", sourceBundleIdentifier: player).isFromBrowser, player)
+        }
+        let safari = try MediaDecoder.decode(Data(#"{"payload":{"bundleIdentifier":"com.apple.WebKit.GPU","parentApplicationBundleIdentifier":"com.apple.Safari","title":"Video"}}"#.utf8))
+        XCTAssertEqual(safari.snapshot?.isFromBrowser, true)
+        XCTAssertEqual(safari.snapshot?.appBundleIdentifier, "com.apple.Safari")
+        XCTAssertEqual(NowPlayingSnapshot(title: "Track", sourceBundleIdentifier: "com.spotify.client").appBundleIdentifier, "com.spotify.client")
+        XCTAssertEqual(safari.snapshot?.seeking(to: 5).isFromBrowser, true)
+    }
+
     func testPausedDoesNotAdvance() {
         let track = NowPlayingSnapshot(title: "Track", duration: 120, elapsed: 30, observedAt: epoch)
         XCTAssertEqual(track.position(at: epoch.addingTimeInterval(60)), 30)

@@ -42,6 +42,18 @@ final class PerformanceTests: XCTestCase {
         await coordinator.receive(.idle)
         XCTAssertNil(coordinator.artwork)
     }
+
+    @MainActor func testBrowserMediaHiddenUntilSwitchedBackOn() async {
+        let coordinator = IslandCoordinator(provider: PerformanceProvider(), enabled: true, showsBrowserMedia: false)
+        await coordinator.receive(.media(NowPlayingSnapshot(title: "Video", sourceBundleIdentifier: "com.google.Chrome")))
+        XCTAssertEqual(coordinator.model.media, .idle)
+        await coordinator.setShowsBrowserMedia(true)
+        XCTAssertEqual(coordinator.model.media.snapshot?.title, "Video")
+        await coordinator.setShowsBrowserMedia(false)
+        XCTAssertEqual(coordinator.model.media, .idle)
+        await coordinator.receive(.media(NowPlayingSnapshot(title: "Song", sourceBundleIdentifier: "com.spotify.client")))
+        XCTAssertEqual(coordinator.model.media.snapshot?.title, "Song")
+    }
 }
 
 @MainActor private final class PerformanceProvider: NowPlayingProviding {

@@ -3,7 +3,7 @@ import ServiceManagement
 import SwiftUI
 
 @MainActor final class SettingsWindowController: NSWindowController {
-    static let contentSize = NSSize(width: 440, height: 430)
+    static let contentSize = NSSize(width: 440, height: 540)
 
     init(coordinator: IslandCoordinator, menuPocket: MenuPocketController) {
         let view = SettingsView(coordinator: coordinator, menuPocket: menuPocket)
@@ -35,8 +35,10 @@ struct SettingsView: View {
     @ObservedObject var menuPocket: MenuPocketController
     @AppStorage("showIsland") private var showIsland = true
     @AppStorage("copyScreenshots") private var copyScreenshots = true
+    @AppStorage("showBrowserMedia") private var showBrowserMedia = true
     @State private var loginEnabled = SMAppService.mainApp.status == .enabled
     @State private var loginMessage: String?
+    @State private var showsBrowserMediaInfo = false
 
     var body: some View {
         Form {
@@ -48,6 +50,30 @@ struct SettingsView: View {
                 if SMAppService.mainApp.status == .requiresApproval {
                     Button("Allow Arc In Login Items…") { SMAppService.openSystemSettingsLoginItems() }
                 }
+            }
+            Section {
+                Toggle(isOn: $showBrowserMedia) {
+                    HStack(spacing: 6) {
+                        Text("Show Media From Browsers")
+                        Button { showsBrowserMediaInfo = true } label: { Image(systemName: "info.circle") }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("About Show Media From Browsers")
+                            .popover(isPresented: $showsBrowserMediaInfo, arrowEdge: .bottom) {
+                                Text("While a browser is playing, Arc can’t show a paused music app such as Spotify or Apple Music instead, so the island stays empty until you play your music again.")
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(width: 260)
+                                    .padding()
+                            }
+                    }
+                }
+                    .onChange(of: showBrowserMedia) { _, enabled in
+                        Task { await coordinator.setShowsBrowserMedia(enabled) }
+                    }
+            } header: {
+                Text("Music")
+            } footer: {
+                Text("Turn off to ignore music and videos playing in browsers such as Safari or Chrome.")
             }
             Section {
                 Toggle("Copy Screenshots To Clipboard", isOn: $copyScreenshots)

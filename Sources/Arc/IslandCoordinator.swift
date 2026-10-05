@@ -13,6 +13,8 @@ import SwiftUI
     @ObservationIgnored private let screenshotMonitor = ScreenshotMonitor()
     @ObservationIgnored private let provider: NowPlayingProviding
     @ObservationIgnored private var copiesScreenshots: Bool
+    @ObservationIgnored private var showsBrowserMedia: Bool
+    @ObservationIgnored private var latestMedia: MediaState = .idle
     @ObservationIgnored private var artworkData: Data?
     @ObservationIgnored private var powerObserver: NSObjectProtocol?
     @ObservationIgnored private var updates: Task<Void, Never>?
@@ -21,9 +23,11 @@ import SwiftUI
     @ObservationIgnored private var pocketWindow: PocketWindowController?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
 
-    init(provider: NowPlayingProviding, enabled: Bool, copiesScreenshots: Bool = true) {
+    init(provider: NowPlayingProviding, enabled: Bool, copiesScreenshots: Bool = true,
+         showsBrowserMedia: Bool = true) {
         self.provider = provider
         self.copiesScreenshots = copiesScreenshots
+        self.showsBrowserMedia = showsBrowserMedia
         model = IslandModel(enabled: enabled)
     }
 
@@ -61,6 +65,7 @@ import SwiftUI
             Task { @MainActor in
                 self?.systemMonitor.start()
                 if self?.copiesScreenshots == true { self?.screenshotMonitor.start() }
+                self?.latestMedia = .idle
                 self?.model.receive(.idle)
                 self?.provider.start()
             }
@@ -75,6 +80,8 @@ import SwiftUI
     }
 
     func receive(_ state: MediaState) async {
+        latestMedia = state
+        let state = showsBrowserMedia || state.snapshot?.isFromBrowser != true ? state : .idle
         let data = state.snapshot?.artworkData
         if data != artworkData {
             let image = await Self.decodeArtwork(data)
@@ -115,6 +122,11 @@ import SwiftUI
         }
     }
 
+    func setShowsBrowserMedia(_ shows: Bool) async {
+        showsBrowserMedia = shows
+        await receive(latestMedia)
+    }
+
     func send(_ command: MediaCommand) {
         guard model.media.snapshot != nil else { return }
         provider.send(command)
@@ -128,7 +140,7 @@ import SwiftUI
     }
 
     func openMediaApp() {
-        guard let bundleIdentifier = model.media.snapshot?.sourceBundleIdentifier,
+        guard let bundleIdentifier = model.media.snapshot?.appBundleIdentifier,
               !bundleIdentifier.isEmpty,
               let applicationURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else { return }
         let configuration = NSWorkspace.OpenConfiguration()
@@ -138,6 +150,7 @@ import SwiftUI
 
     func retry() {
         provider.stop()
+        latestMedia = .idle
         model.receive(.idle)
         provider.start()
     }

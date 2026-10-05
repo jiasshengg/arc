@@ -38,7 +38,8 @@ import SwiftUI
     let coordinator = IslandCoordinator(
         provider: MediaRemoteProvider(),
         enabled: UserDefaults.standard.object(forKey: "showIsland") as? Bool ?? true,
-        copiesScreenshots: UserDefaults.standard.object(forKey: "copyScreenshots") as? Bool ?? true
+        copiesScreenshots: UserDefaults.standard.object(forKey: "copyScreenshots") as? Bool ?? true,
+        showsBrowserMedia: UserDefaults.standard.object(forKey: "showBrowserMedia") as? Bool ?? true
     )
     private lazy var settingsWindow = SettingsWindowController(coordinator: coordinator, menuPocket: menuPocket)
 
