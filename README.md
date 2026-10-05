@@ -1,19 +1,31 @@
 # Arc
 
-> Music controls, useful files, and a little more room in your menu bar.
+> A Dynamic Island for your Mac.
 
-Arc is a free, open-source utility for macOS 14 and later. It places a small
-island beside your MacBook’s notch, at the top of a mirrored display, or below
-the menu bar on other screens. Everything runs locally, with no account,
-subscription, or usage tracking.
+Arc is a free, open-source app that brings an iPhone-style Dynamic Island to
+macOS 14 and later. A small island sits beside your MacBook’s notch and expands
+when you move your pointer over it, showing music controls, files you’ve set
+aside, and brief updates such as charging or a copied screenshot.
+
+On a Mac without a notch, the island sits just below the menu bar. On a
+mirrored display, it sits at the top of the screen. Everything runs locally,
+with no account, subscription, or usage tracking.
 
 ## Features
 
-- **Music controls:** See what’s playing, pause, skip, seek, or open the playing app.
-- **Pocket:** Keep files and folders close by without moving the originals.
+In the island:
+
+- **Music controls:** See what’s playing, pause, skip, move through a track, or
+  open the playing app.
+- **Pocket:** Drop files and folders on the island to keep them close by
+  without moving the originals.
+- **Battery updates:** See brief charging and low-battery messages.
+- **Screenshot copying:** Copy newly saved screenshots to the clipboard
+  automatically, with a brief confirmation.
+
+In the menu bar:
+
 - **Menu Pocket:** Hide less-used menu bar icons and open them from a separate row.
-- **Screenshot copying:** Copy newly saved screenshots to the clipboard automatically.
-- **Battery updates:** See brief charging and low-battery messages in the island.
 
 See [Known Limits](#known-limits) for compatibility and testing details across
 different Macs and media apps.
@@ -35,11 +47,22 @@ stay visible.
 
 Click Arc’s main icon in the menu bar for these options:
 
-- **Show Island** — show or hide the music bar.
-- **Launch At Login** — start Arc when you log in. This is off by default.
 - **Try Connecting Again** — reconnect if Arc can’t read what’s playing.
 - **Open Pocket…** — open your temporary file list.
+- **Settings…** — open the settings window.
 - **Quit Arc** — close Arc.
+
+The settings window has these switches:
+
+- **Show Island** — show or hide the dynamic island.
+- **Launch At Login** — start Arc when you log in. This is off by default.
+- **Show Media From Browsers** — show music and videos playing in browsers such
+  as Safari or Chrome. This is on by default. Turn it off to keep the island for
+  your music apps.
+- **Copy Screenshots To Clipboard** — copy newly saved screenshots. This is on
+  by default.
+- **Menu Pocket** — hide less important menu bar icons behind an arrow. This is
+  off by default.
 
 Keep Arc in a permanent folder before turning on **Launch At Login**. macOS
 may ask you to allow it in System Settings.
@@ -62,7 +85,7 @@ apps still needs more testing.
 
 ## Menu Pocket
 
-Turn on **Menu Pocket** in Arc’s menu. An arrow appears in the menu bar.
+Turn on **Menu Pocket** in Arc’s settings window. An arrow appears in the menu bar.
 To choose which icons to hide:
 
 1. Choose **Arrange Menu Pocket…**. A temporary vertical line appears.
@@ -113,6 +136,9 @@ folder are ignored.
 
 Holding **Control** with the screenshot shortcut already copies the image
 directly to the clipboard. It doesn’t save a file, so Arc won’t show a message.
+
+To stop Arc copying screenshots, turn off **Copy Screenshots To Clipboard** in
+the settings window. Arc then stops watching the screenshot folder.
 
 ## Battery Updates
 
@@ -207,7 +233,10 @@ states.
 - Menu Pocket’s menu opening, icon restoration, and pointer behavior still need
   hands-on testing across third-party apps. Before a release, check opening and
   closing menus repeatedly and confirm all grouped icons remain in the row.
-- Browser videos can appear as now playing. Arc doesn’t filter them out.
+- Browser videos can appear as now playing unless you turn off **Show Media
+  From Browsers**. While a browser is the app macOS reports as playing, Arc
+  can’t show a paused music app instead, so the island stays empty. Web apps
+  installed from Chrome count as a browser.
 - Timers, AirPods features, general notifications, and extra islands aren’t included.
 - Automatic updates and release packaging aren’t automated yet.
 
