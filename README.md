@@ -183,6 +183,11 @@ packages. Open `Package.swift` in Xcode to edit the app. Use the build script
 to run the full app: `swift run` doesn’t include the helper Arc needs to connect
 to your music.
 
+To build a DMG with the drag-to-Applications window, run
+`./scripts/build-dmg.sh`. It rebuilds the release app and saves the DMG in `dist/`.
+macOS may ask for Automation access to Finder so the script can save the window
+layout.
+
 The island uses a transparent window that stays in place while the visible
 content expands. Rounded corners let clicks pass through. Arc prefers the
 built-in notched display and otherwise uses the main display. It supports one
