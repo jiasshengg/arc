@@ -12,6 +12,7 @@ import SwiftUI
     @ObservationIgnored private let systemMonitor = SystemActivityMonitor()
     @ObservationIgnored private let screenshotMonitor = ScreenshotMonitor()
     @ObservationIgnored private let provider: NowPlayingProviding
+    @ObservationIgnored private var copiesScreenshots: Bool
     @ObservationIgnored private var artworkData: Data?
     @ObservationIgnored private var powerObserver: NSObjectProtocol?
     @ObservationIgnored private var updates: Task<Void, Never>?
@@ -20,8 +21,9 @@ import SwiftUI
     @ObservationIgnored private var pocketWindow: PocketWindowController?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
 
-    init(provider: NowPlayingProviding, enabled: Bool) {
+    init(provider: NowPlayingProviding, enabled: Bool, copiesScreenshots: Bool = true) {
         self.provider = provider
+        self.copiesScreenshots = copiesScreenshots
         model = IslandModel(enabled: enabled)
     }
 
@@ -37,7 +39,7 @@ import SwiftUI
         }
         systemMonitor.onBattery = { [weak self] reading in self?.battery = reading }
         screenshotMonitor.onScreenshot = { [weak self] image in self?.showScreenshot(image) }
-        screenshotMonitor.start()
+        if copiesScreenshots { screenshotMonitor.start() }
         systemMonitor.start()
         updates = Task { [weak self, provider] in
             for await state in provider.updates {
@@ -58,7 +60,7 @@ import SwiftUI
         observers.append(center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
                 self?.systemMonitor.start()
-                self?.screenshotMonitor.start()
+                if self?.copiesScreenshots == true { self?.screenshotMonitor.start() }
                 self?.model.receive(.idle)
                 self?.provider.start()
             }
@@ -101,6 +103,16 @@ import SwiftUI
 
     func setEnabled(_ enabled: Bool) {
         model.setEnabled(enabled)
+    }
+
+    func setCopiesScreenshots(_ enabled: Bool) {
+        copiesScreenshots = enabled
+        if enabled {
+            screenshotMonitor.start()
+        } else {
+            screenshotMonitor.stop()
+            model.clearScreenshotFeedback()
+        }
     }
 
     func send(_ command: MediaCommand) {
