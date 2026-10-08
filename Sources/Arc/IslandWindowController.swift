@@ -45,6 +45,9 @@ private final class IslandPanel: NSPanel {
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.present() }
         })
+        observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.present() }
+        })
         localMouse = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged, .leftMouseUp, .leftMouseDown, .rightMouseDown]) { [weak self] event in
             self?.trackPointer()
             return event
@@ -75,18 +78,25 @@ private final class IslandPanel: NSPanel {
             return
         }
         // Prefer the built-in notch even when an external monitor owns the menu bar.
-        guard let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }) ?? NSScreen.screens.first else { return }
+        let screens = NSScreen.screens
+        guard let screen = screens.first(where: { $0.safeAreaInsets.top > 0 }) ?? screens.first else { return }
         let notch = IslandLayout.notchSize(safeTop: screen.safeAreaInsets.top,
                                           leftArea: screen.auxiliaryTopLeftArea, rightArea: screen.auxiliaryTopRightArea)
         coordinator.model.setNotchSize(notch)
         let displayID = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
         let mirrored = displayID.map { CGDisplayIsInMirrorSet($0) != 0 } ?? false
         coordinator.model.displayIsMirrored = mirrored
+        // A closed-lid desktop has no built-in screen; keep the island at the monitor's top edge.
+        let externalOnly = !screens.contains { screen in
+            guard let id = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value else { return true }
+            return CGDisplayIsBuiltin(id) != 0
+        }
+        coordinator.model.displayIsExternalOnly = externalOnly
         // A stationary canvas avoids competing AppKit and SwiftUI layout animations.
         var canvas = IslandLayout.pocketSize(expanded: true, count: Pocket.islandCapacity, receiving: false, notch: notch)
         canvas.width += 24
         canvas.height += 16
-        let frame = IslandLayout.frame(screen: screen.frame, visible: screen.visibleFrame, safeTop: notch.height, size: canvas, mirrored: mirrored)
+        let frame = IslandLayout.frame(screen: screen.frame, visible: screen.visibleFrame, safeTop: notch.height, size: canvas, mirrored: mirrored, externalOnly: externalOnly)
         if panel.frame != frame { panel.setFrame(frame, display: true) }
         panel.orderFrontRegardless()
         trackPointer()

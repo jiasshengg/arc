@@ -133,6 +133,28 @@ final class ArcCoreTests: XCTestCase {
         }
     }
 
+    @MainActor func testExternalOnlyDisplayAttachesToTopAndResetsWhenLidOpens() {
+        let model = IslandModel()
+        model.displayIsExternalOnly = true
+        XCTAssertTrue(model.attachesToTop)
+        XCTAssertEqual(model.notchSize, .zero)
+        let screen = CGRect(x: -2560, y: 200, width: 2560, height: 1440)
+        for visible in [screen, CGRect(x: -2560, y: 260, width: 2560, height: 1356)] {
+            for expanded in [false, true] {
+                let size = IslandLayout.size(expanded: expanded, hasMedia: true)
+                let frame = IslandLayout.frame(screen: screen, visible: visible, safeTop: 0, size: size, externalOnly: model.displayIsExternalOnly)
+                XCTAssertEqual(frame.maxY, screen.maxY)
+                XCTAssertEqual(frame.midX, screen.midX)
+            }
+        }
+        model.displayIsExternalOnly = false
+        XCTAssertFalse(model.attachesToTop)
+        let frame = IslandLayout.frame(screen: screen, visible: screen, safeTop: 0, size: CGSize(width: 240, height: 40), externalOnly: model.displayIsExternalOnly)
+        XCTAssertEqual(frame.maxY, screen.maxY - 8)
+        model.setNotchSize(CGSize(width: 192, height: 32))
+        XCTAssertTrue(model.attachesToTop)
+    }
+
     func testExpansionKeepsTopCenterFixed() {
         let screen = CGRect(x: 0, y: 0, width: 1920, height: 1080)
         let compact = IslandLayout.frame(screen: screen, visible: screen, safeTop: 0, size: IslandLayout.size(expanded: false, hasMedia: true))
