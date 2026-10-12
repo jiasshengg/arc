@@ -81,7 +81,8 @@ The settings window has these controls:
   and a link to Accessibility settings are available here too. The island stays
   hidden while arranging; click the arrow when finished to restore it.
 - **About Arc** — version/build, GitHub, and Report An Issue links.
-- **Reset Settings…** — restore defaults after confirmation, including disabling
+- **Reset Settings…** — standalone button at the bottom-right of the window.
+  Restore defaults after confirmation, including disabling
   Launch At Login, Menu Pocket, and shortcuts. Pocket files stay in place.
 
 Keep Arc in a permanent folder before turning on **Launch At Login**. macOS

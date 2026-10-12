@@ -62,7 +62,7 @@ struct SettingsView: View {
         return build.map { "\(version) (\($0))" } ?? version
     }
 
-    var body: some View {
+    private var settingsForm: some View {
         Form {
             Section("General") {
                 Toggle("Show Island", isOn: $showIsland)
@@ -183,11 +183,24 @@ struct SettingsView: View {
                 Link("GitHub", destination: URL(string: "https://github.com/jiasshengg/arc")!)
                 Link("Report An Issue", destination: URL(string: "https://github.com/jiasshengg/arc/issues/new")!)
             }
-            Section {
-                Button("Reset Settings…", role: .destructive) { showsResetConfirmation = true }
-            }
         }
         .formStyle(.grouped)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            settingsForm
+            HStack {
+                Spacer()
+                Button("Reset Settings…", role: .destructive) { showsResetConfirmation = true }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            .padding(.bottom, 16)
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
         .alert("Reset Settings?", isPresented: $showsResetConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Reset Settings", role: .destructive, action: resetSettings)
