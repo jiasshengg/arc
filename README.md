@@ -73,7 +73,9 @@ The settings window has these controls:
   independently of clipboard copying. This is on by default.
 - **Keyboard Shortcuts** — optionally enable Control-Option-P to open Pocket
   and Control-Option-I to show or hide the island while other apps are active.
-  Both are off by default.
+  Both are off by default. Click either key combination to record a custom
+  shortcut using Command, Control, or Option, with optional Shift. Escape cancels.
+  Conflicting changes to enabled shortcuts keep the previous combination.
 - **Menu Pocket** — hide less important menu bar icons behind an arrow. This is
   off by default.
 

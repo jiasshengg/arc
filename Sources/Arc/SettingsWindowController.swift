@@ -49,6 +49,9 @@ struct SettingsView: View {
     @State private var loginEnabled = SMAppService.mainApp.status == .enabled
     @State private var loginMessage: String?
     @State private var showsBrowserMediaInfo = false
+    @State private var isRecording = false
+    @State private var recordingAction = KeyboardShortcutController.Action.openPocket
+    @State private var recordingMessage: String?
 
     var body: some View {
         Form {
@@ -127,15 +130,25 @@ struct SettingsView: View {
                 Text("Copy saved screenshots, show a brief island preview, or use both.")
             }
             Section {
-                Toggle("Open Pocket (⌃⌥P)", isOn: Binding(get: { shortcuts.openPocketEnabled },
-                    set: { shortcuts.setEnabled($0, for: .openPocket) }))
-                Toggle("Show Or Hide Island (⌃⌥I)", isOn: Binding(get: { shortcuts.toggleIslandEnabled },
-                    set: { shortcuts.setEnabled($0, for: .toggleIsland) }))
+                ForEach(KeyboardShortcutController.Action.allCases, id: \.rawValue) { action in
+                    HStack {
+                        Toggle(action.title, isOn: Binding(
+                            get: { action == .openPocket ? shortcuts.openPocketEnabled : shortcuts.toggleIslandEnabled },
+                            set: { shortcuts.setEnabled($0, for: action) }))
+                        Button(shortcuts.binding(for: action).label) {
+                            recordingAction = action
+                            recordingMessage = nil
+                            isRecording = true
+                        }
+                        .help("Change \(action.title) Shortcut")
+                        .accessibilityLabel("Change \(action.title) Shortcut: \(shortcuts.binding(for: action).label)")
+                    }
+                }
                 if let message = shortcuts.errorMessage { Text(message).font(.caption).foregroundStyle(.secondary) }
             } header: {
                 Text("Keyboard Shortcuts")
             } footer: {
-                Text("Use Control and Option with the letter shown. Shortcuts work while other apps are active.")
+                Text("Click a key combination to change it. Shortcuts work while other apps are active.")
             }
             Section {
                 Toggle("Menu Pocket", isOn: Binding(get: { menuPocket.isEnabled }, set: menuPocket.setEnabled))
@@ -146,6 +159,28 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .sheet(isPresented: $isRecording, onDismiss: { shortcuts.endRecording() }) {
+            VStack(spacing: 16) {
+                Text("Change \(recordingAction.title) Shortcut").font(.headline)
+                Text("Press a letter, number, or punctuation key with Command, Control, or Option. Add Shift if needed.")
+                    .multilineTextAlignment(.center)
+                if let recordingMessage { Text(recordingMessage).foregroundStyle(.secondary) }
+                ShortcutRecorder(record: { event in
+                    guard let shortcut = KeyboardShortcutController.Shortcut(event: event) else {
+                        recordingMessage = "Include Command, Control, or Option with a printable key."
+                        return
+                    }
+                    shortcuts.endRecording()
+                    shortcuts.setShortcut(shortcut, for: recordingAction)
+                    isRecording = false
+                }, cancel: { isRecording = false })
+                    .frame(width: 1, height: 1)
+                Button("Cancel") { isRecording = false }
+            }
+            .padding(24)
+            .frame(width: 350)
+            .onAppear { shortcuts.beginRecording() }
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
             screens = NSScreen.screens
         }
