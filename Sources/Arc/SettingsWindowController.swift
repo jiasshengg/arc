@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import ServiceManagement
 import SwiftUI
 
@@ -49,9 +50,17 @@ struct SettingsView: View {
     @State private var loginEnabled = SMAppService.mainApp.status == .enabled
     @State private var loginMessage: String?
     @State private var showsBrowserMediaInfo = false
+    @State private var accessibilityAllowed = AXIsProcessTrusted()
+    @State private var showsResetConfirmation = false
     @State private var isRecording = false
     @State private var recordingAction = KeyboardShortcutController.Action.openPocket
     @State private var recordingMessage: String?
+
+    private var version: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        return build.map { "\(version) (\($0))" } ?? version
+    }
 
     var body: some View {
         Form {
@@ -152,13 +161,35 @@ struct SettingsView: View {
             }
             Section {
                 Toggle("Menu Pocket", isOn: Binding(get: { menuPocket.isEnabled }, set: menuPocket.setEnabled))
+                Button("Arrange Menu Pocket…") { menuPocket.showSetup() }
+                    .disabled(!menuPocket.isEnabled)
+                LabeledContent("Accessibility", value: accessibilityAllowed ? "Allowed" : "Not Allowed")
+                if !accessibilityAllowed {
+                    Button("Open Accessibility Settings…") {
+                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+                    }
+                }
             } header: {
                 Text("Menu Bar")
             } footer: {
-                Text("Keep less important menu bar icons behind an arrow.")
+                Text("Keep less important menu bar icons behind an arrow. Allow Arc in Accessibility settings to find and open those icons.")
+            }
+            Section("About Arc") {
+                LabeledContent("Version", value: version)
+                Link("GitHub", destination: URL(string: "https://github.com/jiasshengg/arc")!)
+                Link("Report An Issue", destination: URL(string: "https://github.com/jiasshengg/arc/issues/new")!)
+            }
+            Section {
+                Button("Reset Settings…", role: .destructive) { showsResetConfirmation = true }
             }
         }
         .formStyle(.grouped)
+        .alert("Reset Settings?", isPresented: $showsResetConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Reset Settings", role: .destructive, action: resetSettings)
+        } message: {
+            Text("Restore Arc’s default settings and shortcuts. Launch At Login and Menu Pocket will be turned off. Files in Pocket will stay.")
+        }
         .sheet(isPresented: $isRecording, onDismiss: { shortcuts.endRecording() }) {
             VStack(spacing: 16) {
                 Text("Change \(recordingAction.title) Shortcut").font(.headline)
@@ -187,6 +218,25 @@ struct SettingsView: View {
         // Login approval is granted in System Settings; refresh when the user returns.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             loginEnabled = SMAppService.mainApp.status == .enabled
+            accessibilityAllowed = AXIsProcessTrusted()
+        }
+    }
+
+    private func resetSettings() {
+        showIsland = true
+        islandDisplayID = ""
+        hideWhenIdle = false
+        expandOnHover = true
+        hoverDelay = 0.1
+        showBatteryAlerts = true
+        showBrowserMedia = true
+        pausedMusicDelay = 0
+        copyScreenshots = true
+        showScreenshotPreview = true
+        shortcuts.reset()
+        menuPocket.setEnabled(false)
+        if SMAppService.mainApp.status == .enabled || SMAppService.mainApp.status == .requiresApproval {
+            setLogin(false)
         }
     }
 

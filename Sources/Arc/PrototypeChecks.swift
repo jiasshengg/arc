@@ -178,7 +178,7 @@ import SwiftUI
                                                       shortcuts: KeyboardShortcutController(coordinator: settingsCoordinator))
                     try snapshot(settingsWindow, size: SettingsWindowController.contentSize,
                                  to: directory.appendingPathComponent("settings-window.png"))
-                    let settingsOverviewSize = CGSize(width: 440, height: 1040)
+                    let settingsOverviewSize = CGSize(width: 440, height: 1400)
                     try snapshot(settingsWindow.frame(width: settingsOverviewSize.width, height: settingsOverviewSize.height),
                                  size: settingsOverviewSize, to: directory.appendingPathComponent("settings-overview.png"))
                     let menuPocketSize = CGSize(width: 320, height: 72)
