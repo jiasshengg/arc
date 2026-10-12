@@ -171,7 +171,7 @@ struct SettingsView: View {
                 HStack {
                     Text("Menu Bar")
                     Spacer()
-                    Button("Arrange…") { menuPocket.showSetup() }
+                    Button("Arrange") { menuPocket.showSetup() }
                         .buttonStyle(.borderless)
                         .disabled(!menuPocket.isEnabled)
                         .help("Arrange Menu Pocket")
@@ -194,7 +194,7 @@ struct SettingsView: View {
             settingsForm
             HStack {
                 Spacer()
-                Button("Reset Settings…", role: .destructive) { showsResetConfirmation = true }
+                Button("Reset Settings", role: .destructive) { showsResetConfirmation = true }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
             }
