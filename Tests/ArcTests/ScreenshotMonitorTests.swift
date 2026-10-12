@@ -3,6 +3,21 @@ import XCTest
 @testable import Arc
 
 final class ScreenshotMonitorTests: XCTestCase {
+    @MainActor func testPreviewOnlyNeverWritesClipboard() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = try capture(in: directory, name: "capture", date: Date())
+        var copies = 0
+        var previews = 0
+        let monitor = ScreenshotMonitor(loadImage: { _ in NSImage(size: NSSize(width: 1, height: 1)) },
+                                        copyImage: { _ in copies += 1; return true })
+        monitor.copiesToClipboard = false
+        monitor.onScreenshot = { _ in previews += 1 }
+        await monitor.process(file)
+        XCTAssertEqual(copies, 0)
+        XCTAssertEqual(previews, 1)
+    }
+
     @MainActor func testDelayedOlderCaptureCannotOverwriteNewerCapture() async throws {
         let directory = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

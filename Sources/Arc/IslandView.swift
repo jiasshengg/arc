@@ -122,12 +122,15 @@ struct IslandView: View {
         .preferredColorScheme(.dark)
     }
 
+    private var screenshotTitle: String { coordinator.screenshotWasCopied ? "Screenshot Copied" : "Screenshot Saved" }
+    private var screenshotDetail: String { coordinator.screenshotWasCopied ? "Ready To Paste" : "Saved To Your Screenshot Folder" }
+
     private var screenshotView: some View {
         HStack(spacing: 12) {
             screenshotThumbnail(size: 44)
             VStack(alignment: .leading, spacing: 3) {
-                Text("Screenshot Copied").font(.system(size: 13, weight: .semibold))
-                Text("Ready To Paste").font(.system(size: 11)).foregroundStyle(.white.opacity(0.55))
+                Text(screenshotTitle).font(.system(size: 13, weight: .semibold))
+                Text(screenshotDetail).font(.system(size: 11)).foregroundStyle(.white.opacity(0.55))
             }
             Spacer()
             Image(systemName: "checkmark.circle.fill")
@@ -137,7 +140,7 @@ struct IslandView: View {
         .padding(.horizontal, 20)
         .frame(height: 64)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Screenshot Copied, ready to paste")
+        .accessibilityLabel("\(screenshotTitle), \(screenshotDetail)")
     }
 
     private var compactScreenshotView: some View {
@@ -153,14 +156,14 @@ struct IslandView: View {
             } else {
                 HStack(spacing: 10) {
                     screenshotThumbnail(size: 24)
-                    Text("Screenshot Copied").font(.system(size: 11, weight: .medium))
+                    Text(screenshotTitle).font(.system(size: 11, weight: .medium))
                     Spacer(minLength: 0)
                     Image(systemName: "checkmark").foregroundStyle(chargingGreen)
                 }.padding(.horizontal, 10)
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Screenshot Copied")
+        .accessibilityLabel(screenshotTitle)
     }
 
     private func screenshotThumbnail(size: CGFloat) -> some View {

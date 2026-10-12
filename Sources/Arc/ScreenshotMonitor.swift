@@ -3,13 +3,14 @@ import Darwin
 import Foundation
 
 @MainActor final class ScreenshotMonitor {
+    var copiesToClipboard = true
     var onScreenshot: ((NSImage) -> Void)?
 
     private var source: DispatchSourceFileSystemObject?
     private var knownURLs: Set<URL> = []
     private var scanTask: Task<Void, Never>?
     private var processingTasks: [URL: Task<Void, Never>] = [:]
-    private var latestCopied: (date: Date, path: String)?
+    private var latestProcessed: (date: Date, path: String)?
     private let loadImage: (URL) -> NSImage?
     private let copyImage: (NSImage) -> Bool
 
@@ -49,7 +50,7 @@ import Foundation
         source?.cancel()
         source = nil
         knownURLs.removeAll()
-        latestCopied = nil
+        latestProcessed = nil
     }
 
     private func scheduleScan(_ directory: URL) {
@@ -80,11 +81,11 @@ import Foundation
         for attempt in 0..<6 {
             guard !Task.isCancelled else { return }
             // Metadata can arrive out of order. Never replace a newer capture
-            // that has already reached the clipboard with an older one.
-            if let latestCopied, order <= latestCopied { return }
+            // that has already been processed with an older one.
+            if let latestProcessed, order <= latestProcessed { return }
             if let image = loadImage(url) {
-                guard copyImage(image) else { return }
-                latestCopied = order
+                if copiesToClipboard, !copyImage(image) { return }
+                latestProcessed = order
                 onScreenshot?(image)
                 return
             }

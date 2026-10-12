@@ -61,6 +61,8 @@ The settings window has these switches:
   your music apps.
 - **Copy Screenshots To Clipboard** — copy newly saved screenshots. This is on
   by default.
+- **Show Screenshot Preview** — briefly preview saved screenshots in the island,
+  independently of clipboard copying. This is on by default.
 - **Menu Pocket** — hide less important menu bar icons behind an arrow. This is
   off by default.
 
@@ -138,7 +140,9 @@ Holding **Control** with the screenshot shortcut already copies the image
 directly to the clipboard. It doesn’t save a file, so Arc won’t show a message.
 
 To stop Arc copying screenshots, turn off **Copy Screenshots To Clipboard** in
-the settings window. Arc then stops watching the screenshot folder.
+the settings window. To stop watching the screenshot folder entirely, also turn
+off **Show Screenshot Preview**. With previews on and copying off, the island
+shows “Screenshot Saved.”
 
 ## Battery Updates
 

@@ -38,6 +38,7 @@ struct SettingsView: View {
     @AppStorage("pausedMusicDelay") private var pausedMusicDelay = 0.0
     @AppStorage("expandOnHover") private var expandOnHover = true
     @AppStorage("hoverDelay") private var hoverDelay = 0.1
+    @AppStorage("showScreenshotPreview") private var showScreenshotPreview = true
     @AppStorage("showIsland") private var showIsland = true
     @AppStorage("copyScreenshots") private var copyScreenshots = true
     @AppStorage("showBrowserMedia") private var showBrowserMedia = true
@@ -104,10 +105,12 @@ struct SettingsView: View {
             Section {
                 Toggle("Copy Screenshots To Clipboard", isOn: $copyScreenshots)
                     .onChange(of: copyScreenshots) { _, enabled in coordinator.setCopiesScreenshots(enabled) }
+                Toggle("Show Screenshot Preview", isOn: $showScreenshotPreview)
+                    .onChange(of: showScreenshotPreview) { _, shows in coordinator.setShowsScreenshotPreview(shows) }
             } header: {
                 Text("Screenshots")
             } footer: {
-                Text("New screenshots saved as files are copied so you can paste them right away.")
+                Text("Copy saved screenshots, show a brief island preview, or use both.")
             }
             Section {
                 Toggle("Menu Pocket", isOn: Binding(get: { menuPocket.isEnabled }, set: menuPocket.setEnabled))

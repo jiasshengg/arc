@@ -8,6 +8,8 @@ import SwiftUI
     let model: IslandModel
     private(set) var artwork: NSImage?
     private(set) var screenshot: NSImage?
+    private(set) var screenshotWasCopied = true
+    @ObservationIgnored private var showsScreenshotPreview: Bool
     private(set) var battery: BatteryReading?
     @ObservationIgnored private let systemMonitor = SystemActivityMonitor()
     @ObservationIgnored private let screenshotMonitor = ScreenshotMonitor()
@@ -24,9 +26,11 @@ import SwiftUI
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
 
     init(provider: NowPlayingProviding, enabled: Bool, copiesScreenshots: Bool = true,
-         showsBrowserMedia: Bool = true) {
+         showsBrowserMedia: Bool = true, showsScreenshotPreview: Bool = true) {
         self.provider = provider
         self.copiesScreenshots = copiesScreenshots
+        self.showsScreenshotPreview = showsScreenshotPreview
+        screenshotMonitor.copiesToClipboard = copiesScreenshots
         self.showsBrowserMedia = showsBrowserMedia
         model = IslandModel(enabled: enabled)
     }
@@ -43,7 +47,7 @@ import SwiftUI
         }
         systemMonitor.onBattery = { [weak self] reading in self?.battery = reading }
         screenshotMonitor.onScreenshot = { [weak self] image in self?.showScreenshot(image) }
-        if copiesScreenshots { screenshotMonitor.start() }
+        updateScreenshotMonitoring()
         systemMonitor.start()
         updates = Task { [weak self, provider] in
             for await state in provider.updates {
@@ -64,7 +68,7 @@ import SwiftUI
         observers.append(center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
                 self?.systemMonitor.start()
-                if self?.copiesScreenshots == true { self?.screenshotMonitor.start() }
+                self?.updateScreenshotMonitoring()
                 self?.latestMedia = .idle
                 self?.model.receive(.idle)
                 self?.provider.start()
@@ -114,12 +118,22 @@ import SwiftUI
 
     func setCopiesScreenshots(_ enabled: Bool) {
         copiesScreenshots = enabled
-        if enabled {
-            screenshotMonitor.start()
-        } else {
-            screenshotMonitor.stop()
+        screenshotMonitor.copiesToClipboard = enabled
+        updateScreenshotMonitoring()
+    }
+
+    func setShowsScreenshotPreview(_ shows: Bool) {
+        showsScreenshotPreview = shows
+        if !shows {
+            screenshot = nil
             model.clearScreenshotFeedback()
         }
+        updateScreenshotMonitoring()
+    }
+
+    private func updateScreenshotMonitoring() {
+        if copiesScreenshots || showsScreenshotPreview { screenshotMonitor.start() }
+        else { screenshotMonitor.stop() }
     }
 
     func setShowsBrowserMedia(_ shows: Bool) async {
@@ -160,6 +174,8 @@ import SwiftUI
     }
 
     func showScreenshot(_ image: NSImage) {
+        guard showsScreenshotPreview else { return }
+        screenshotWasCopied = copiesScreenshots
         screenshot = image
         model.showScreenshotCopied()
     }

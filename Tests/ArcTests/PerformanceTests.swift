@@ -4,6 +4,21 @@ import ArcCore
 @testable import Arc
 
 final class PerformanceTests: XCTestCase {
+    @MainActor func testScreenshotPreviewIsIndependentOfCopying() {
+        let coordinator = IslandCoordinator(provider: PerformanceProvider(), enabled: true,
+                                            copiesScreenshots: false, showsScreenshotPreview: true)
+        let image = NSImage(size: NSSize(width: 1, height: 1))
+        coordinator.showScreenshot(image)
+        XCTAssertTrue(coordinator.model.screenshotCopied)
+        XCTAssertFalse(coordinator.screenshotWasCopied)
+        coordinator.setShowsScreenshotPreview(false)
+        XCTAssertFalse(coordinator.model.screenshotCopied)
+        XCTAssertNil(coordinator.screenshot)
+        coordinator.showScreenshot(image)
+        XCTAssertFalse(coordinator.model.screenshotCopied)
+        coordinator.stop()
+    }
+
     @MainActor func testPlaybackAnimationsStopAndResume() throws {
         let view = PlaybackBarsView()
         let bars = try XCTUnwrap(view.layer?.sublayers)
