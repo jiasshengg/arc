@@ -2,6 +2,16 @@ import XCTest
 @testable import ArcCore
 
 final class SettingsTests: XCTestCase {
+    func testDisplaySelectionUsesPreferenceAndFallsBackWhenDisconnected() {
+        let ids = ["external", "built-in"]
+        XCTAssertEqual(IslandLayout.screenIndex(ids: ids, notchedIndex: 1, preferredID: ""), 1)
+        XCTAssertEqual(IslandLayout.screenIndex(ids: ids, notchedIndex: 1, preferredID: "external"), 0)
+        XCTAssertEqual(IslandLayout.screenIndex(ids: ids, notchedIndex: 1, preferredID: "missing"), 1)
+        XCTAssertEqual(IslandLayout.screenIndex(ids: ["external"], notchedIndex: nil, preferredID: "built-in"), 0)
+        XCTAssertEqual(IslandLayout.screenIndex(ids: ["external", "built-in"], notchedIndex: 1, preferredID: "built-in"), 1)
+        XCTAssertNil(IslandLayout.screenIndex(ids: [], notchedIndex: nil, preferredID: "missing"))
+    }
+
     @MainActor func testHoverOffAllowsExplicitExpansionAndDragEntry() async throws {
         let model = IslandModel(enterDelay: 0, exitDelay: 0)
         model.setExpandsOnHover(false)

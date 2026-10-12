@@ -57,6 +57,7 @@ import SwiftUI
         coordinator.model.setPausedMusicDelay(UserDefaults.standard.double(forKey: "pausedMusicDelay"))
         coordinator.model.setExpandsOnHover(UserDefaults.standard.object(forKey: "expandOnHover") as? Bool ?? true)
         coordinator.model.setHoverDelay(UserDefaults.standard.object(forKey: "hoverDelay") as? Double ?? 0.1)
+        coordinator.model.preferredDisplayID = UserDefaults.standard.string(forKey: "islandDisplayID") ?? ""
         coordinator.start()
         menuPocket.start()
     }

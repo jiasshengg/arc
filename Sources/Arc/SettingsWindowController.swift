@@ -39,6 +39,8 @@ struct SettingsView: View {
     @AppStorage("expandOnHover") private var expandOnHover = true
     @AppStorage("hoverDelay") private var hoverDelay = 0.1
     @AppStorage("showScreenshotPreview") private var showScreenshotPreview = true
+    @AppStorage("islandDisplayID") private var islandDisplayID = ""
+    @State private var screens = NSScreen.screens
     @AppStorage("showIsland") private var showIsland = true
     @AppStorage("copyScreenshots") private var copyScreenshots = true
     @AppStorage("showBrowserMedia") private var showBrowserMedia = true
@@ -51,6 +53,16 @@ struct SettingsView: View {
             Section("General") {
                 Toggle("Show Island", isOn: $showIsland)
                     .onChange(of: showIsland) { _, enabled in coordinator.setEnabled(enabled) }
+                Picker("Display", selection: $islandDisplayID) {
+                    Text("Automatic").tag("")
+                    ForEach(screens, id: \.self) { screen in
+                        Text(screen.localizedName).tag(IslandWindowController.displayIdentifier(screen))
+                    }
+                    if !islandDisplayID.isEmpty && !screens.contains(where: { IslandWindowController.displayIdentifier($0) == islandDisplayID }) {
+                        Text("Disconnected Display").tag(islandDisplayID)
+                    }
+                }
+                .onChange(of: islandDisplayID) { _, id in coordinator.model.preferredDisplayID = id }
                 Toggle("Hide When Idle", isOn: $hideWhenIdle)
                     .onChange(of: hideWhenIdle) { _, hide in coordinator.model.hideWhenIdle = hide }
                 Toggle("Expand On Hover", isOn: $expandOnHover)
@@ -123,6 +135,9 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .frame(width: SettingsWindowController.contentSize.width,
                height: SettingsWindowController.contentSize.height)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
+            screens = NSScreen.screens
+        }
         // Login approval is granted in System Settings; refresh when the user returns.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             loginEnabled = SMAppService.mainApp.status == .enabled

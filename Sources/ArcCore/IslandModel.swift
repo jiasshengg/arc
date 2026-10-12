@@ -83,6 +83,7 @@ import Observation
     }
     public private(set) var notchSize: CGSize = .zero
     public func setNotchSize(_ size: CGSize) { notchSize = size }
+    public var preferredDisplayID = ""
     public var displayIsMirrored = false
     public var displayIsExternalOnly = false
     public var attachesToTop: Bool { notchSize.height > 0 || displayIsMirrored || displayIsExternalOnly }
@@ -161,6 +162,11 @@ import Observation
 }
 
 public enum IslandLayout {
+    public static func screenIndex(ids: [String], notchedIndex: Int?, preferredID: String) -> Int? {
+        if !preferredID.isEmpty, let index = ids.firstIndex(of: preferredID) { return index }
+        return notchedIndex ?? (ids.isEmpty ? nil : 0)
+    }
+
     public static func notchSize(safeTop: CGFloat, leftArea: CGRect?, rightArea: CGRect?) -> CGSize {
         guard safeTop > 0, let leftArea, let rightArea,
               rightArea.minX > leftArea.maxX else { return .zero }

@@ -63,6 +63,7 @@ private final class IslandPanel: NSPanel {
         withObservationTracking {
             _ = coordinator.model.enabled
             _ = coordinator.model.shouldShowIsland
+            _ = coordinator.model.preferredDisplayID
         } onChange: { [weak self] in
             Task { @MainActor in
                 self?.present()
@@ -78,9 +79,12 @@ private final class IslandPanel: NSPanel {
             inside = false
             return
         }
-        // Prefer the built-in notch even when an external monitor owns the menu bar.
+        // Automatic prefers the built-in notch; disconnected choices fall back to Automatic.
         let screens = NSScreen.screens
-        guard let screen = screens.first(where: { $0.safeAreaInsets.top > 0 }) ?? screens.first else { return }
+        guard let index = IslandLayout.screenIndex(ids: screens.map(Self.displayIdentifier),
+                                                   notchedIndex: screens.firstIndex(where: { $0.safeAreaInsets.top > 0 }),
+                                                   preferredID: coordinator.model.preferredDisplayID) else { return }
+        let screen = screens[index]
         let notch = IslandLayout.notchSize(safeTop: screen.safeAreaInsets.top,
                                           leftArea: screen.auxiliaryTopLeftArea, rightArea: screen.auxiliaryTopRightArea)
         coordinator.model.setNotchSize(notch)
@@ -131,6 +135,12 @@ private final class IslandPanel: NSPanel {
             inside = nowInside
             coordinator.model.hover(nowInside)
         }
+    }
+
+    static func displayIdentifier(_ screen: NSScreen) -> String {
+        guard let id = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value,
+              let uuid = CGDisplayCreateUUIDFromDisplayID(id)?.takeRetainedValue() else { return "" }
+        return CFUUIDCreateString(nil, uuid) as String
     }
 
     func close() {
