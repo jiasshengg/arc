@@ -49,6 +49,23 @@ final class SystemActivityTests: XCTestCase {
         XCTAssertTrue(model.shouldTick)
     }
 
+    @MainActor func testBatteryAlertsCanBeDisabledWithoutChangingMedia() {
+        let model = IslandModel()
+        let track = NowPlayingSnapshot(title: "Test", isPlaying: true)
+        model.receive(.media(track))
+        model.showActivity(SystemActivity(kind: .charging, level: 0.6))
+        model.setShowsBatteryAlerts(false)
+        XCTAssertNil(model.activity)
+        model.showActivity(SystemActivity(kind: .lowBattery, level: 0.1))
+        XCTAssertNil(model.activity)
+        XCTAssertEqual(model.media, .media(track))
+        model.setShowsBatteryAlerts(true)
+        XCTAssertNil(model.activity)
+        model.showActivity(SystemActivity(kind: .unplugged, level: 0.5))
+        XCTAssertEqual(model.activity?.kind, .unplugged)
+        model.clearActivity()
+    }
+
     @MainActor func testHiddenIslandDropsActivity() {
         let model = IslandModel()
         model.showActivity(SystemActivity(kind: .charging, level: 0.6))

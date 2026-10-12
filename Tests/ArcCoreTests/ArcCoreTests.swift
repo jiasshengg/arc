@@ -42,6 +42,21 @@ final class ArcCoreTests: XCTestCase {
         XCTAssertEqual(track.position(at: epoch.addingTimeInterval(-10)), 30)
     }
 
+    func testBrowserMediaIsRecognizedBySourceOrParentApp() throws {
+        for browser in ["com.apple.Safari", "com.google.Chrome", "com.google.Chrome.canary",
+                        "org.mozilla.firefox", "com.microsoft.edgemac", "company.thebrowser.Browser"] {
+            XCTAssertTrue(NowPlayingSnapshot(title: "Video", sourceBundleIdentifier: browser).isFromBrowser, browser)
+        }
+        for player in ["com.spotify.client", "com.apple.Music", "com.google.Chromecast", ""] {
+            XCTAssertFalse(NowPlayingSnapshot(title: "Track", sourceBundleIdentifier: player).isFromBrowser, player)
+        }
+        let safari = try MediaDecoder.decode(Data(#"{"payload":{"bundleIdentifier":"com.apple.WebKit.GPU","parentApplicationBundleIdentifier":"com.apple.Safari","title":"Video"}}"#.utf8))
+        XCTAssertEqual(safari.snapshot?.isFromBrowser, true)
+        XCTAssertEqual(safari.snapshot?.appBundleIdentifier, "com.apple.Safari")
+        XCTAssertEqual(NowPlayingSnapshot(title: "Track", sourceBundleIdentifier: "com.spotify.client").appBundleIdentifier, "com.spotify.client")
+        XCTAssertEqual(safari.snapshot?.seeking(to: 5).isFromBrowser, true)
+    }
+
     func testPausedDoesNotAdvance() {
         let track = NowPlayingSnapshot(title: "Track", duration: 120, elapsed: 30, observedAt: epoch)
         XCTAssertEqual(track.position(at: epoch.addingTimeInterval(60)), 30)
@@ -116,6 +131,57 @@ final class ArcCoreTests: XCTestCase {
             let unmirrored = IslandLayout.frame(screen: screen, visible: visible, safeTop: 0, size: size, mirrored: false)
             XCTAssertEqual(unmirrored.maxY, visible.maxY - 8)
         }
+    }
+
+    @MainActor func testSelectedExternalDisplayAttachesWhileBuiltInRemainsConnected() {
+        let model = IslandModel()
+        // Extended desktop: built-in is present, and the selected monitor is external.
+        model.displayIsExternalOnly = false
+        model.displayIsMirrored = false
+        model.displayIsExternal = true
+        XCTAssertTrue(model.attachesToTop)
+        XCTAssertEqual(model.notchSize, .zero)
+        let screen = CGRect(x: -2560, y: 200, width: 2560, height: 1440)
+        let visible = CGRect(x: -2560, y: 260, width: 2560, height: 1356)
+        for expanded in [false, true] {
+            let size = IslandLayout.size(expanded: expanded, hasMedia: true)
+            for usable in [visible, screen] {
+                let frame = IslandLayout.frame(screen: screen, visible: usable, safeTop: 0, size: size,
+                                               external: model.displayIsExternal)
+                XCTAssertEqual(frame.maxY, screen.maxY)
+                XCTAssertEqual(frame.midX, screen.midX)
+            }
+        }
+        // Selecting a built-in screen resets both geometry and the outline state.
+        model.displayIsExternal = false
+        XCTAssertFalse(model.attachesToTop)
+        let frame = IslandLayout.frame(screen: screen, visible: visible, safeTop: 0,
+                                       size: CGSize(width: 240, height: 40), external: model.displayIsExternal)
+        XCTAssertEqual(frame.maxY, visible.maxY - 8)
+        model.setNotchSize(CGSize(width: 192, height: 32))
+        XCTAssertTrue(model.attachesToTop)
+    }
+
+    @MainActor func testExternalOnlyDisplayAttachesToTopAndResetsWhenLidOpens() {
+        let model = IslandModel()
+        model.displayIsExternalOnly = true
+        XCTAssertTrue(model.attachesToTop)
+        XCTAssertEqual(model.notchSize, .zero)
+        let screen = CGRect(x: -2560, y: 200, width: 2560, height: 1440)
+        for visible in [screen, CGRect(x: -2560, y: 260, width: 2560, height: 1356)] {
+            for expanded in [false, true] {
+                let size = IslandLayout.size(expanded: expanded, hasMedia: true)
+                let frame = IslandLayout.frame(screen: screen, visible: visible, safeTop: 0, size: size, externalOnly: model.displayIsExternalOnly)
+                XCTAssertEqual(frame.maxY, screen.maxY)
+                XCTAssertEqual(frame.midX, screen.midX)
+            }
+        }
+        model.displayIsExternalOnly = false
+        XCTAssertFalse(model.attachesToTop)
+        let frame = IslandLayout.frame(screen: screen, visible: screen, safeTop: 0, size: CGSize(width: 240, height: 40), externalOnly: model.displayIsExternalOnly)
+        XCTAssertEqual(frame.maxY, screen.maxY - 8)
+        model.setNotchSize(CGSize(width: 192, height: 32))
+        XCTAssertTrue(model.attachesToTop)
     }
 
     func testExpansionKeepsTopCenterFixed() {

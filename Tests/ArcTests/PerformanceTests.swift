@@ -4,6 +4,21 @@ import ArcCore
 @testable import Arc
 
 final class PerformanceTests: XCTestCase {
+    @MainActor func testScreenshotPreviewIsIndependentOfCopying() {
+        let coordinator = IslandCoordinator(provider: PerformanceProvider(), enabled: true,
+                                            copiesScreenshots: false, showsScreenshotPreview: true)
+        let image = NSImage(size: NSSize(width: 1, height: 1))
+        coordinator.showScreenshot(image)
+        XCTAssertTrue(coordinator.model.screenshotCopied)
+        XCTAssertFalse(coordinator.screenshotWasCopied)
+        coordinator.setShowsScreenshotPreview(false)
+        XCTAssertFalse(coordinator.model.screenshotCopied)
+        XCTAssertNil(coordinator.screenshot)
+        coordinator.showScreenshot(image)
+        XCTAssertFalse(coordinator.model.screenshotCopied)
+        coordinator.stop()
+    }
+
     @MainActor func testPlaybackAnimationsStopAndResume() throws {
         let view = PlaybackBarsView()
         let bars = try XCTUnwrap(view.layer?.sublayers)
@@ -41,6 +56,18 @@ final class PerformanceTests: XCTestCase {
         XCTAssertFalse(coordinator.artwork === firstImage)
         await coordinator.receive(.idle)
         XCTAssertNil(coordinator.artwork)
+    }
+
+    @MainActor func testBrowserMediaHiddenUntilSwitchedBackOn() async {
+        let coordinator = IslandCoordinator(provider: PerformanceProvider(), enabled: true, showsBrowserMedia: false)
+        await coordinator.receive(.media(NowPlayingSnapshot(title: "Video", sourceBundleIdentifier: "com.google.Chrome")))
+        XCTAssertEqual(coordinator.model.media, .idle)
+        await coordinator.setShowsBrowserMedia(true)
+        XCTAssertEqual(coordinator.model.media.snapshot?.title, "Video")
+        await coordinator.setShowsBrowserMedia(false)
+        XCTAssertEqual(coordinator.model.media, .idle)
+        await coordinator.receive(.media(NowPlayingSnapshot(title: "Song", sourceBundleIdentifier: "com.spotify.client")))
+        XCTAssertEqual(coordinator.model.media.snapshot?.title, "Song")
     }
 }
 

@@ -25,7 +25,7 @@ struct IslandView: View {
         if model.activity != nil {
             return IslandLayout.activitySize(expanded: model.expanded, notch: model.notchSize)
         }
-        return IslandLayout.size(expanded: model.expanded, hasMedia: model.media.snapshot != nil, notch: model.notchSize)
+        return IslandLayout.size(expanded: model.expanded, hasMedia: model.visibleMedia.snapshot != nil, notch: model.notchSize)
     }
     private var outline: UnevenRoundedRectangle {
         UnevenRoundedRectangle(
@@ -82,7 +82,7 @@ struct IslandView: View {
                 }
             } else if model.expanded {
                 Group {
-                    if let track = model.media.snapshot { expanded(track) }
+                    if let track = model.visibleMedia.snapshot { expanded(track) }
                     else { empty.frame(height: 100) }
                 }
                 // Keep full-size content stable while the surrounding shape opens.
@@ -101,23 +101,36 @@ struct IslandView: View {
         .foregroundStyle(.white)
         .clipShape(outline)
         .overlay { outline.strokeBorder(.white.opacity(model.attachesToTop ? 0 : 0.10), lineWidth: 0.5) }
+        .overlay {
+            if !model.expanded && !model.expandsOnHover {
+                Button(action: model.expand) { Color.clear.contentShape(Rectangle()) }
+                    .buttonStyle(.plain)
+                    .help("Expand Island")
+                    .accessibilityLabel("Expand Island")
+            }
+        }
         .onGeometryChange(for: CGSize.self) { $0.size } action: { onSizeChange($0) }
         .animation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: model.expanded ? 0.42 : 0.28, dampingFraction: 0.88), value: size)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .ignoresSafeArea()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Arc Island")
-        .accessibilityAction(named: "Expand Island") { model.hover(true) }
+        .accessibilityAction(named: "Expand Island") { model.expand() }
         .accessibilityAction(named: "Minimize Island") { model.collapse() }
+        .opacity(model.shouldShowIsland ? 1 : 0)
+        .accessibilityHidden(!model.shouldShowIsland)
         .preferredColorScheme(.dark)
     }
+
+    private var screenshotTitle: String { coordinator.screenshotWasCopied ? "Screenshot Copied" : "Screenshot Saved" }
+    private var screenshotDetail: String { coordinator.screenshotWasCopied ? "Ready To Paste" : "Saved To Your Screenshot Folder" }
 
     private var screenshotView: some View {
         HStack(spacing: 12) {
             screenshotThumbnail(size: 44)
             VStack(alignment: .leading, spacing: 3) {
-                Text("Screenshot Copied").font(.system(size: 13, weight: .semibold))
-                Text("Ready To Paste").font(.system(size: 11)).foregroundStyle(.white.opacity(0.55))
+                Text(screenshotTitle).font(.system(size: 13, weight: .semibold))
+                Text(screenshotDetail).font(.system(size: 11)).foregroundStyle(.white.opacity(0.55))
             }
             Spacer()
             Image(systemName: "checkmark.circle.fill")
@@ -127,7 +140,7 @@ struct IslandView: View {
         .padding(.horizontal, 20)
         .frame(height: 64)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Screenshot Copied, ready to paste")
+        .accessibilityLabel("\(screenshotTitle), \(screenshotDetail)")
     }
 
     private var compactScreenshotView: some View {
@@ -143,14 +156,14 @@ struct IslandView: View {
             } else {
                 HStack(spacing: 10) {
                     screenshotThumbnail(size: 24)
-                    Text("Screenshot Copied").font(.system(size: 11, weight: .medium))
+                    Text(screenshotTitle).font(.system(size: 11, weight: .medium))
                     Spacer(minLength: 0)
                     Image(systemName: "checkmark").foregroundStyle(chargingGreen)
                 }.padding(.horizontal, 10)
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Screenshot Copied")
+        .accessibilityLabel(screenshotTitle)
     }
 
     private func screenshotThumbnail(size: CGFloat) -> some View {
@@ -229,7 +242,7 @@ struct IslandView: View {
     }
 
     @ViewBuilder private var compact: some View {
-        if let track = model.media.snapshot {
+        if let track = model.visibleMedia.snapshot {
             if attached {
                 Button(action: coordinator.openMediaApp) {
                     HStack(spacing: 0) {
@@ -355,12 +368,12 @@ struct IslandView: View {
 
     private var empty: some View {
         HStack(spacing: 14) {
-            Image(systemName: model.media == .unavailable ? "antenna.radiowaves.left.and.right.slash" : "music.note")
+            Image(systemName: model.visibleMedia == .unavailable ? "antenna.radiowaves.left.and.right.slash" : "music.note")
                 .font(.system(size: 24)).foregroundStyle(accent)
             VStack(alignment: .leading, spacing: 5) {
-                Text(model.media == .unavailable ? "Can’t Connect To Your Music" : "Your Music, Close By")
+                Text(model.visibleMedia == .unavailable ? "Can’t Connect To Your Music" : "Your Music, Close By")
                     .font(.system(size: 13, weight: .semibold))
-                Text(model.media == .unavailable ? "Choose Try Connecting Again in Arc’s menu." : "Play something to get started.")
+                Text(model.visibleMedia == .unavailable ? "Choose Try Connecting Again in Arc’s menu." : "Play something to get started.")
                     .font(.system(size: 11)).foregroundStyle(.white.opacity(0.5))
             }
         }.padding(20)

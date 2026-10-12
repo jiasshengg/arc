@@ -1,6 +1,5 @@
 import AppKit
 import ArcCore
-import ServiceManagement
 import SwiftUI
 
 @main struct ArcApp: App {
@@ -8,7 +7,8 @@ import SwiftUI
 
     var body: some Scene {
         MenuBarExtra {
-            ArcMenu(coordinator: delegate.coordinator, menuPocket: delegate.menuPocket)
+            ArcMenu(coordinator: delegate.coordinator, menuPocket: delegate.menuPocket,
+                    showSettings: delegate.showSettings)
         } label: {
             Image(nsImage: Self.menuBarIcon)
                 .accessibilityLabel("Arc")
@@ -37,19 +37,37 @@ import SwiftUI
     let menuPocket = MenuPocketController()
     let coordinator = IslandCoordinator(
         provider: MediaRemoteProvider(),
-        enabled: UserDefaults.standard.object(forKey: "showIsland") as? Bool ?? true
+        enabled: UserDefaults.standard.object(forKey: "showIsland") as? Bool ?? true,
+        copiesScreenshots: UserDefaults.standard.object(forKey: "copyScreenshots") as? Bool ?? true,
+        showsBrowserMedia: UserDefaults.standard.object(forKey: "showBrowserMedia") as? Bool ?? true,
+        showsScreenshotPreview: UserDefaults.standard.object(forKey: "showScreenshotPreview") as? Bool ?? true
     )
+    private lazy var shortcuts = KeyboardShortcutController(coordinator: coordinator)
+    private lazy var settingsWindow = SettingsWindowController(coordinator: coordinator, menuPocket: menuPocket, shortcuts: shortcuts)
+
+    func showSettings() { settingsWindow.show() }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         #if DEBUG
         if PrototypeChecks.runIfRequested() { return }
         #endif
+        menuPocket.onArrangementChanged = { [weak coordinator] arranging in
+            coordinator?.setArrangingMenuPocket(arranging)
+        }
         coordinator.menuPocketControlFrame = { [weak menuPocket] in menuPocket?.chevronFrame }
+        coordinator.model.setShowsBatteryAlerts(UserDefaults.standard.object(forKey: "showBatteryAlerts") as? Bool ?? true)
+        coordinator.model.hideWhenIdle = UserDefaults.standard.bool(forKey: "hideWhenIdle")
+        coordinator.model.setPausedMusicDelay(UserDefaults.standard.double(forKey: "pausedMusicDelay"))
+        coordinator.model.setExpandsOnHover(UserDefaults.standard.object(forKey: "expandOnHover") as? Bool ?? true)
+        coordinator.model.setHoverDelay(UserDefaults.standard.object(forKey: "hoverDelay") as? Double ?? 0.1)
+        coordinator.model.preferredDisplayID = UserDefaults.standard.string(forKey: "islandDisplayID") ?? ""
         coordinator.start()
         menuPocket.start()
+        shortcuts.start()
     }
     func applicationWillTerminate(_ notification: Notification) {
+        shortcuts.stop()
         menuPocket.stop()
         coordinator.stop()
     }
@@ -58,20 +76,10 @@ import SwiftUI
 private struct ArcMenu: View {
     let coordinator: IslandCoordinator
     @ObservedObject var menuPocket: MenuPocketController
-    @AppStorage("showIsland") private var showIsland = true
-    @State private var loginEnabled = SMAppService.mainApp.status == .enabled
-    @State private var loginMessage: String?
+    let showSettings: () -> Void
 
     var body: some View {
         Text("Arc · Music Within Reach")
-        Divider()
-        Toggle("Show Island", isOn: $showIsland)
-            .onChange(of: showIsland) { _, enabled in coordinator.setEnabled(enabled) }
-        Toggle("Launch At Login", isOn: Binding(get: { loginEnabled }, set: setLogin))
-        if let loginMessage { Text(loginMessage) }
-        if SMAppService.mainApp.status == .requiresApproval {
-            Button("Allow Arc In Login Items…") { SMAppService.openSystemSettingsLoginItems() }
-        }
         Divider()
         if coordinator.model.media == .unavailable {
             Text("Can’t Connect To Your Music")
@@ -86,29 +94,17 @@ private struct ArcMenu: View {
             Text("Battery: \(battery.percent)% · \(battery.charging ? "Charging" : (battery.pluggedIn ? "Plugged In" : "On Battery"))")
             Divider()
         }
-        Toggle("Menu Pocket", isOn: Binding(get: { menuPocket.isEnabled }, set: menuPocket.setEnabled))
         if menuPocket.isEnabled {
             Button(menuPocket.isExpanded ? "Hide Menu Icons" : (menuPocket.isBarOpen ? "Close Menu Pocket" : "Open Menu Pocket")) { menuPocket.toggle() }
             Button("Arrange Menu Pocket…") { menuPocket.showSetup() }
+            Divider()
         }
-        Divider()
         Text("Pocket: \(coordinator.model.pocket.items.count) items")
         Button("Open Pocket…") { coordinator.showPocket() }
         Button("Clear") { coordinator.model.pocket.clear() }
             .disabled(coordinator.model.pocket.items.isEmpty)
         Divider()
+        Button("Settings…", action: showSettings).keyboardShortcut(",")
         Button("Quit Arc") { NSApp.terminate(nil) }.keyboardShortcut("q")
-    }
-
-    private func setLogin(_ enabled: Bool) {
-        do {
-            if enabled { try SMAppService.mainApp.register() }
-            else { try SMAppService.mainApp.unregister() }
-            loginEnabled = SMAppService.mainApp.status == .enabled
-            loginMessage = SMAppService.mainApp.status == .requiresApproval ? "Allow Arc in System Settings to start it when you log in." : nil
-        } catch {
-            loginEnabled = SMAppService.mainApp.status == .enabled
-            loginMessage = "Couldn’t change Launch At Login: \(error.localizedDescription)"
-        }
     }
 }

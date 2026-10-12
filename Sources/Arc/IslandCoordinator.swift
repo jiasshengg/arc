@@ -8,10 +8,15 @@ import SwiftUI
     let model: IslandModel
     private(set) var artwork: NSImage?
     private(set) var screenshot: NSImage?
+    private(set) var screenshotWasCopied = true
+    @ObservationIgnored private var showsScreenshotPreview: Bool
     private(set) var battery: BatteryReading?
     @ObservationIgnored private let systemMonitor = SystemActivityMonitor()
     @ObservationIgnored private let screenshotMonitor = ScreenshotMonitor()
     @ObservationIgnored private let provider: NowPlayingProviding
+    @ObservationIgnored private var copiesScreenshots: Bool
+    @ObservationIgnored private var showsBrowserMedia: Bool
+    @ObservationIgnored private var latestMedia: MediaState = .idle
     @ObservationIgnored private var artworkData: Data?
     @ObservationIgnored private var powerObserver: NSObjectProtocol?
     @ObservationIgnored private var updates: Task<Void, Never>?
@@ -20,8 +25,13 @@ import SwiftUI
     @ObservationIgnored private var pocketWindow: PocketWindowController?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
 
-    init(provider: NowPlayingProviding, enabled: Bool) {
+    init(provider: NowPlayingProviding, enabled: Bool, copiesScreenshots: Bool = true,
+         showsBrowserMedia: Bool = true, showsScreenshotPreview: Bool = true) {
         self.provider = provider
+        self.copiesScreenshots = copiesScreenshots
+        self.showsScreenshotPreview = showsScreenshotPreview
+        screenshotMonitor.copiesToClipboard = copiesScreenshots
+        self.showsBrowserMedia = showsBrowserMedia
         model = IslandModel(enabled: enabled)
     }
 
@@ -37,7 +47,7 @@ import SwiftUI
         }
         systemMonitor.onBattery = { [weak self] reading in self?.battery = reading }
         screenshotMonitor.onScreenshot = { [weak self] image in self?.showScreenshot(image) }
-        screenshotMonitor.start()
+        updateScreenshotMonitoring()
         systemMonitor.start()
         updates = Task { [weak self, provider] in
             for await state in provider.updates {
@@ -58,7 +68,8 @@ import SwiftUI
         observers.append(center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
                 self?.systemMonitor.start()
-                self?.screenshotMonitor.start()
+                self?.updateScreenshotMonitoring()
+                self?.latestMedia = .idle
                 self?.model.receive(.idle)
                 self?.provider.start()
             }
@@ -73,6 +84,8 @@ import SwiftUI
     }
 
     func receive(_ state: MediaState) async {
+        latestMedia = state
+        let state = showsBrowserMedia || state.snapshot?.isFromBrowser != true ? state : .idle
         let data = state.snapshot?.artworkData
         if data != artworkData {
             let image = await Self.decodeArtwork(data)
@@ -99,8 +112,39 @@ import SwiftUI
         pocketWindow?.close()
     }
 
+    func setArrangingMenuPocket(_ arranging: Bool) {
+        model.setArrangingMenuPocket(arranging)
+        // Hide synchronously before setup opens a modal alert.
+        window?.present()
+    }
+
     func setEnabled(_ enabled: Bool) {
         model.setEnabled(enabled)
+    }
+
+    func setCopiesScreenshots(_ enabled: Bool) {
+        copiesScreenshots = enabled
+        screenshotMonitor.copiesToClipboard = enabled
+        updateScreenshotMonitoring()
+    }
+
+    func setShowsScreenshotPreview(_ shows: Bool) {
+        showsScreenshotPreview = shows
+        if !shows {
+            screenshot = nil
+            model.clearScreenshotFeedback()
+        }
+        updateScreenshotMonitoring()
+    }
+
+    private func updateScreenshotMonitoring() {
+        if copiesScreenshots || showsScreenshotPreview { screenshotMonitor.start() }
+        else { screenshotMonitor.stop() }
+    }
+
+    func setShowsBrowserMedia(_ shows: Bool) async {
+        showsBrowserMedia = shows
+        await receive(latestMedia)
     }
 
     func send(_ command: MediaCommand) {
@@ -116,7 +160,7 @@ import SwiftUI
     }
 
     func openMediaApp() {
-        guard let bundleIdentifier = model.media.snapshot?.sourceBundleIdentifier,
+        guard let bundleIdentifier = model.media.snapshot?.appBundleIdentifier,
               !bundleIdentifier.isEmpty,
               let applicationURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else { return }
         let configuration = NSWorkspace.OpenConfiguration()
@@ -126,6 +170,7 @@ import SwiftUI
 
     func retry() {
         provider.stop()
+        latestMedia = .idle
         model.receive(.idle)
         provider.start()
     }
@@ -135,6 +180,8 @@ import SwiftUI
     }
 
     func showScreenshot(_ image: NSImage) {
+        guard showsScreenshotPreview else { return }
+        screenshotWasCopied = copiesScreenshots
         screenshot = image
         model.showScreenshotCopied()
     }

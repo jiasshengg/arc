@@ -14,21 +14,46 @@ import Observation
     }
 
     public func setReceivingFiles(_ receiving: Bool) {
-        guard receivingFiles != receiving, !receiving || enabled else { return }
+        guard receivingFiles != receiving, !receiving || (enabled && !isArrangingMenuPocket) else { return }
         receivingFiles = receiving
         if receiving { hoverTask?.cancel(); expanded = true }
         else { collapse() }
     }
 
     public private(set) var media: MediaState = .idle
+    public private(set) var pausedMediaHidden = false
+    public var visibleMedia: MediaState { pausedMediaHidden ? .idle : media }
+    @ObservationIgnored private var pausedMediaTask: Task<Void, Never>?
+    @ObservationIgnored private var pausedMusicDelay: TimeInterval = 0
+
+    public func setPausedMusicDelay(_ delay: TimeInterval) {
+        pausedMusicDelay = delay.isFinite ? max(0, delay) : 0
+        schedulePausedMusicHiding()
+    }
+
+    private func schedulePausedMusicHiding() {
+        pausedMediaTask?.cancel()
+        pausedMediaHidden = false
+        guard pausedMusicDelay > 0, media.snapshot?.isPlaying == false else { return }
+        let delay = pausedMusicDelay
+        pausedMediaTask = Task { [weak self] in
+            do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+            self?.pausedMediaHidden = true
+        }
+    }
     public private(set) var expanded = false
+    public private(set) var showsBatteryAlerts = true
+    public func setShowsBatteryAlerts(_ shows: Bool) {
+        showsBatteryAlerts = shows
+        if !shows { clearActivity() }
+    }
     public private(set) var activity: SystemActivity?
     @ObservationIgnored private var activityTask: Task<Void, Never>?
     public private(set) var screenshotCopied = false
     @ObservationIgnored private var screenshotTask: Task<Void, Never>?
 
     public func showActivity(_ activity: SystemActivity, duration: UInt64 = 1_500_000_000) {
-        guard enabled else { return }
+        guard enabled, showsBatteryAlerts else { return }
         activityTask?.cancel()
         self.activity = activity
         activityTask = Task { [weak self] in
@@ -58,18 +83,52 @@ import Observation
     }
     public private(set) var notchSize: CGSize = .zero
     public func setNotchSize(_ size: CGSize) { notchSize = size }
+    public var preferredDisplayID = ""
     public var displayIsMirrored = false
-    public var attachesToTop: Bool { notchSize.height > 0 || displayIsMirrored }
+    public var displayIsExternalOnly = false
+    public var displayIsExternal = false
+    public var attachesToTop: Bool { notchSize.height > 0 || displayIsMirrored || displayIsExternalOnly || displayIsExternal }
+    public private(set) var isArrangingMenuPocket = false
+    public func setArrangingMenuPocket(_ arranging: Bool) {
+        isArrangingMenuPocket = arranging
+        if arranging {
+            pointerInside = false
+            receivingFiles = false
+            collapse()
+        }
+    }
+    public var hideWhenIdle = false
+    public var shouldShowIsland: Bool {
+        enabled && !isArrangingMenuPocket && ((!hideWhenIdle && !pausedMediaHidden) || visibleMedia.snapshot != nil || !pocket.items.isEmpty || receivingFiles || activity != nil || screenshotCopied)
+    }
     public private(set) var enabled: Bool
     @ObservationIgnored private var hoverTask: Task<Void, Never>?
-    @ObservationIgnored private let enterDelay: UInt64
+    @ObservationIgnored private var pointerInside = false
+    public private(set) var expandsOnHover = true
+    public func setExpandsOnHover(_ expands: Bool) {
+        expandsOnHover = expands
+        guard !receivingFiles, !draggingFileOut else { return }
+        if !expands { collapse() }
+        else if pointerInside { hover(true) }
+    }
+    public func setHoverDelay(_ delay: TimeInterval) {
+        enterDelay = UInt64(min(1, max(0, delay.isFinite ? delay : 0.1)) * 1_000_000_000)
+        if pointerInside { hover(true) }
+    }
+    public func expand() {
+        guard shouldShowIsland else { return }
+        hoverTask?.cancel()
+        pocket.refresh()
+        expanded = true
+    }
+    @ObservationIgnored private var enterDelay: UInt64
     @ObservationIgnored private let exitDelay: UInt64
     public var displayAwake = true
     public var lowPowerMode = false
     public var shouldAnimatePlayback: Bool {
-        enabled && displayAwake && !lowPowerMode && !showsPocket && activity == nil && !screenshotCopied && media.snapshot?.isPlaying == true
+        enabled && !isArrangingMenuPocket && displayAwake && !lowPowerMode && !showsPocket && activity == nil && !screenshotCopied && media.snapshot?.isPlaying == true
     }
-    public var shouldTick: Bool { enabled && displayAwake && expanded && !showsPocket && activity == nil && !screenshotCopied && media.snapshot?.isPlaying == true }
+    public var shouldTick: Bool { enabled && !isArrangingMenuPocket && displayAwake && expanded && !showsPocket && activity == nil && !screenshotCopied && media.snapshot?.isPlaying == true }
 
     public init(enabled: Bool = true, enterDelay: UInt64 = 100_000_000, exitDelay: UInt64 = 100_000_000) {
         self.enabled = enabled
@@ -77,33 +136,52 @@ import Observation
         self.exitDelay = exitDelay
     }
 
-    public func receive(_ state: MediaState) { media = state }
+    public func receive(_ state: MediaState) {
+        let previous = media.snapshot
+        media = state
+        let current = state.snapshot
+        // Metadata refreshes for the same paused track must not restart the deadline.
+        if let previous, let current, !previous.isPlaying, !current.isPlaying,
+           previous.title == current.title, previous.artist == current.artist,
+           previous.album == current.album, previous.duration == current.duration,
+           previous.appBundleIdentifier == current.appBundleIdentifier { return }
+        schedulePausedMusicHiding()
+    }
     public func seek(to position: TimeInterval, at date: Date = Date()) {
         guard let snapshot = media.snapshot, snapshot.duration != nil else { return }
         media = .media(snapshot.seeking(to: position, at: date))
     }
     public func setEnabled(_ enabled: Bool) {
         self.enabled = enabled
-        if !enabled { receivingFiles = false; collapse(); clearActivity(); clearScreenshotFeedback() }
+        if !enabled { pointerInside = false; receivingFiles = false; collapse(); clearActivity(); clearScreenshotFeedback() }
     }
     public func collapse() {
         hoverTask?.cancel()
         expanded = false
     }
     public func hover(_ inside: Bool) {
+        pointerInside = inside
         hoverTask?.cancel()
-        guard enabled, !receivingFiles, !draggingFileOut else { return }
-        if inside { pocket.refresh() }
+        guard shouldShowIsland, !receivingFiles, !draggingFileOut else { return }
+        if inside {
+            guard expandsOnHover else { return }
+            pocket.refresh()
+        }
         let delay = inside ? enterDelay : exitDelay
         hoverTask = Task { [weak self] in
             do { try await Task.sleep(nanoseconds: delay) } catch { return }
-            guard let self, self.enabled else { return }
+            guard let self, self.shouldShowIsland else { return }
             self.expanded = inside
         }
     }
 }
 
 public enum IslandLayout {
+    public static func screenIndex(ids: [String], notchedIndex: Int?, preferredID: String) -> Int? {
+        if !preferredID.isEmpty, let index = ids.firstIndex(of: preferredID) { return index }
+        return notchedIndex ?? (ids.isEmpty ? nil : 0)
+    }
+
     public static func notchSize(safeTop: CGFloat, leftArea: CGRect?, rightArea: CGRect?) -> CGSize {
         guard safeTop > 0, let leftArea, let rightArea,
               rightArea.minX > leftArea.maxX else { return .zero }
@@ -131,8 +209,8 @@ public enum IslandLayout {
         return CGSize(width: max(280, notch.width + 88), height: notch.height + 64)
     }
 
-    public static func frame(screen: CGRect, visible: CGRect, safeTop: CGFloat, size: CGSize, mirrored: Bool = false) -> CGRect {
-        let top = safeTop > 0 || mirrored ? screen.maxY : visible.maxY - 8
+    public static func frame(screen: CGRect, visible: CGRect, safeTop: CGFloat, size: CGSize, mirrored: Bool = false, externalOnly: Bool = false, external: Bool = false) -> CGRect {
+        let top = safeTop > 0 || mirrored || externalOnly || external ? screen.maxY : visible.maxY - 8
         let width = min(size.width, screen.width)
         return CGRect(x: screen.midX - width / 2, y: top - size.height, width: width, height: size.height)
     }

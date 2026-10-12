@@ -5,6 +5,7 @@ public struct NowPlayingSnapshot: Equatable, Sendable {
     public let artist: String
     public let album: String
     public let sourceBundleIdentifier: String
+    public let parentBundleIdentifier: String
     public let artworkData: Data?
     public let duration: TimeInterval?
     public let elapsed: TimeInterval
@@ -13,13 +14,14 @@ public struct NowPlayingSnapshot: Equatable, Sendable {
     public let playbackRate: Double
 
     public init(title: String, artist: String = "", album: String = "",
-                sourceBundleIdentifier: String = "", artworkData: Data? = nil,
-                duration: TimeInterval? = nil, elapsed: TimeInterval = 0,
+                sourceBundleIdentifier: String = "", parentBundleIdentifier: String = "",
+                artworkData: Data? = nil, duration: TimeInterval? = nil, elapsed: TimeInterval = 0,
                 observedAt: Date = Date(), isPlaying: Bool = false, playbackRate: Double = 1) {
         self.title = title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Unknown title" : title
         self.artist = artist
         self.album = album
         self.sourceBundleIdentifier = sourceBundleIdentifier
+        self.parentBundleIdentifier = parentBundleIdentifier
         self.artworkData = artworkData
         self.duration = duration.flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
         self.elapsed = elapsed.isFinite ? max(0, elapsed) : 0
@@ -42,11 +44,37 @@ public struct NowPlayingSnapshot: Equatable, Sendable {
     public func seeking(to position: TimeInterval, at date: Date = Date()) -> NowPlayingSnapshot {
         NowPlayingSnapshot(
             title: title, artist: artist, album: album,
-            sourceBundleIdentifier: sourceBundleIdentifier, artworkData: artworkData,
+            sourceBundleIdentifier: sourceBundleIdentifier, parentBundleIdentifier: parentBundleIdentifier,
+            artworkData: artworkData,
             duration: duration, elapsed: min(duration ?? .greatestFiniteMagnitude, max(0, position)),
             observedAt: date, isPlaying: isPlaying, playbackRate: playbackRate
         )
     }
+
+    /// The app to open for this media: the parent app when a helper process is playing.
+    public var appBundleIdentifier: String {
+        parentBundleIdentifier.isEmpty ? sourceBundleIdentifier : parentBundleIdentifier
+    }
+
+    /// Some browsers play media in a helper process, so the parent app is checked too.
+    public var isFromBrowser: Bool {
+        [sourceBundleIdentifier, parentBundleIdentifier].contains { identifier in
+            let identifier = identifier.lowercased()
+            return Self.browserBundleIdentifiers.contains { identifier == $0 || identifier.hasPrefix($0 + ".") }
+        }
+    }
+
+    /// Lowercased; a prefix match also covers beta channels and helper processes.
+    private static let browserBundleIdentifiers = [
+        "com.apple.safari", "com.apple.safaritechnologypreview",
+        "com.google.chrome", "org.chromium.chromium",
+        "org.mozilla.firefox", "org.mozilla.firefoxdeveloperedition", "org.mozilla.nightly",
+        "com.microsoft.edgemac", "com.brave.browser",
+        "company.thebrowser.browser", "company.thebrowser.dia",
+        "com.operasoftware.opera", "com.operasoftware.operagx",
+        "com.vivaldi.vivaldi", "app.zen-browser.zen",
+        "com.kagi.kagimacos", "com.duckduckgo.macos.browser"
+    ]
 }
 
 public enum MediaState: Equatable, Sendable {
@@ -90,7 +118,9 @@ public enum MediaDecoder {
             title: payload["title"] as? String ?? "Unknown title",
             artist: payload["artist"] as? String ?? "",
             album: payload["album"] as? String ?? "",
-            sourceBundleIdentifier: source, artworkData: artwork,
+            sourceBundleIdentifier: source,
+            parentBundleIdentifier: payload["parentApplicationBundleIdentifier"] as? String ?? "",
+            artworkData: artwork,
             duration: seconds("durationMicros"), elapsed: seconds("elapsedTimeMicros") ?? 0,
             observedAt: timestamp, isPlaying: payload["playing"] as? Bool ?? false,
             playbackRate: (payload["playbackRate"] as? NSNumber)?.doubleValue ?? 1

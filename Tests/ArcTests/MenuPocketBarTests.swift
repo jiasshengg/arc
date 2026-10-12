@@ -1,9 +1,35 @@
 import AppKit
 import ApplicationServices
 import XCTest
+import SwiftUI
 @testable import Arc
 
 final class MenuPocketBarTests: XCTestCase {
+    @MainActor func testOverflowRowNeverShowsNativeScrollbars() async throws {
+        let hosting = NSHostingView(rootView: MenuPocketBar.scrollbarPreview().frame(width: 320, height: 72))
+        hosting.frame = CGRect(x: 0, y: 0, width: 320, height: 72)
+        let window = NSWindow(contentRect: hosting.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = hosting
+        defer { window.close() }
+        hosting.layoutSubtreeIfNeeded()
+        try await Task.sleep(for: .milliseconds(30))
+        hosting.layoutSubtreeIfNeeded()
+        func findScrollView(_ view: NSView) -> NSScrollView? {
+            if let scrollView = view as? NSScrollView { return scrollView }
+            return view.subviews.lazy.compactMap(findScrollView).first
+        }
+        let scrollView = try XCTUnwrap(findScrollView(hosting))
+        XCTAssertFalse(scrollView.hasHorizontalScroller)
+        XCTAssertFalse(scrollView.hasVerticalScroller)
+        let document = try XCTUnwrap(scrollView.documentView)
+        XCTAssertGreaterThan(document.frame.width, scrollView.contentView.bounds.width)
+        let offset = document.frame.width - scrollView.contentView.bounds.width
+        scrollView.contentView.scroll(to: NSPoint(x: offset, y: 0))
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+        XCTAssertGreaterThan(scrollView.contentView.bounds.origin.x, 0)
+    }
+
     @MainActor func testGroupingUsesLiveDividerAfterAnotherIconReturns() {
         let bar = MenuPocketBar()
         let beforeRestore = CGRect(x: -4100, y: 0, width: 5000, height: 33)

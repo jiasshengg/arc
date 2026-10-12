@@ -96,6 +96,8 @@ import SwiftUI
                         ("idle-expanded", .idle, true),
                         ("playing-compact", .media(track()), false),
                         ("playing-expanded", .media(track()), true),
+                        ("external-compact", .media(track()), false),
+                        ("external-expanded", .media(track()), true),
                         ("mirrored-compact", .media(track()), false),
                         ("mirrored-expanded", .media(track()), true),
                         ("paused-expanded", .media(track(playing: false)), true),
@@ -125,6 +127,7 @@ import SwiftUI
                         let notch = name.hasPrefix("notch-") ? CGSize(width: 192, height: 32) : .zero
                         coordinator.model.setNotchSize(notch)
                         coordinator.model.displayIsMirrored = name.hasPrefix("mirrored-")
+                        coordinator.model.displayIsExternal = name.hasPrefix("external-")
                         coordinator.model.receive(state)
                         if expanded {
                             coordinator.model.hover(true)
@@ -169,7 +172,19 @@ import SwiftUI
                         .frame(width: pocketWindowSize.width, height: pocketWindowSize.height)
                     try snapshot(pocketWindow, size: pocketWindowSize,
                                  to: directory.appendingPathComponent("pocket-window.png"))
-                    print("Rendered \(fixtures.count + 1) prototype states to \(directory.path)")
+                    let settingsCoordinator = IslandCoordinator(provider: FixtureProvider(), enabled: true)
+                    let settingsWindow = SettingsView(coordinator: settingsCoordinator,
+                                                      menuPocket: MenuPocketController(),
+                                                      shortcuts: KeyboardShortcutController(coordinator: settingsCoordinator))
+                    try snapshot(settingsWindow, size: SettingsWindowController.contentSize,
+                                 to: directory.appendingPathComponent("settings-window.png"))
+                    let settingsOverviewSize = CGSize(width: 440, height: 1400)
+                    try snapshot(settingsWindow.frame(width: settingsOverviewSize.width, height: settingsOverviewSize.height),
+                                 size: settingsOverviewSize, to: directory.appendingPathComponent("settings-overview.png"))
+                    let menuPocketSize = CGSize(width: 320, height: 72)
+                    try snapshot(MenuPocketBar.scrollbarPreview().frame(width: menuPocketSize.width, height: menuPocketSize.height),
+                                 size: menuPocketSize, to: directory.appendingPathComponent("menu-pocket-overflow.png"))
+                    print("Rendered \(fixtures.count + 4) prototype states to \(directory.path)")
                     exit(0)
                 } catch {
                     fputs("Preview rendering failed: \(error)\n", stderr)
