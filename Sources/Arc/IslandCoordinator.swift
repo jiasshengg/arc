@@ -112,6 +112,12 @@ import SwiftUI
         pocketWindow?.close()
     }
 
+    func setArrangingMenuPocket(_ arranging: Bool) {
+        model.setArrangingMenuPocket(arranging)
+        // Hide synchronously before setup opens a modal alert.
+        window?.present()
+    }
+
     func setEnabled(_ enabled: Bool) {
         model.setEnabled(enabled)
     }

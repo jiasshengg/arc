@@ -2,6 +2,40 @@ import XCTest
 @testable import ArcCore
 
 final class SettingsTests: XCTestCase {
+    @MainActor func testArrangementSuppressesContentInteractionsAndPlaybackWithoutChangingPreference() async throws {
+        let model = IslandModel(enterDelay: 0)
+        model.receive(.media(NowPlayingSnapshot(title: "Song", isPlaying: true)))
+        model.expand()
+        XCTAssertTrue(model.shouldTick)
+        model.hover(true)
+        model.setArrangingMenuPocket(true)
+        XCTAssertTrue(model.enabled)
+        XCTAssertFalse(model.expanded)
+        XCTAssertFalse(model.shouldShowIsland)
+        XCTAssertFalse(model.shouldTick)
+        XCTAssertFalse(model.shouldAnimatePlayback)
+        model.expand()
+        model.hover(true)
+        model.setReceivingFiles(true)
+        model.showActivity(SystemActivity(kind: .charging, level: 0.5))
+        model.showScreenshotCopied()
+        try await Task.sleep(for: .milliseconds(20))
+        XCTAssertFalse(model.expanded)
+        XCTAssertFalse(model.receivingFiles)
+        XCTAssertFalse(model.shouldShowIsland)
+        XCTAssertEqual(model.media.snapshot?.title, "Song")
+        model.clearActivity()
+        model.clearScreenshotFeedback()
+        model.setArrangingMenuPocket(false)
+        XCTAssertTrue(model.shouldShowIsland)
+        XCTAssertTrue(model.shouldAnimatePlayback)
+        model.setArrangingMenuPocket(true)
+        model.setEnabled(false)
+        model.setArrangingMenuPocket(false)
+        XCTAssertFalse(model.enabled)
+        XCTAssertFalse(model.shouldShowIsland)
+    }
+
     func testDisplaySelectionUsesPreferenceAndFallsBackWhenDisconnected() {
         let ids = ["external", "built-in"]
         XCTAssertEqual(IslandLayout.screenIndex(ids: ids, notchedIndex: 1, preferredID: ""), 1)

@@ -16,7 +16,10 @@ import Combine
     private var spacerWidth: NSLayoutConstraint?
     private var screenFrames: [CGRect] = []
     private let expandedLength: CGFloat = 0
-    private var isArranging = false
+    var onArrangementChanged: ((Bool) -> Void)?
+    private(set) var isArranging = false {
+        didSet { if isArranging != oldValue { onArrangementChanged?(isArranging) } }
+    }
     private let dividerImage: NSImage = {
         // Draw the separator directly; "line.vertical" is not an SF Symbol.
         let image = NSImage(size: NSSize(width: 2, height: 14), flipped: false) { rect in
@@ -124,16 +127,19 @@ import Combine
         updateAppearance()
     }
 
-    func showSetup() {
+    func beginArrangement() {
+        guard isEnabled else { return }
         bar.close()
-        if isEnabled {
-            isArranging = true
-            isExpanded = true
-            updateAppearance()
-        }
+        isArranging = true
+        isExpanded = true
+        updateAppearance()
+    }
+
+    func showSetup() {
+        beginArrangement()
         let alert = NSAlert()
         alert.messageText = "Arrange Menu Pocket"
-        alert.informativeText = "Hold Command and drag the icons you want to hide to the left of the vertical line. Keep the line to the left of Arc’s arrow.\n\nKeep Arc’s main icon, battery, Wi-Fi, Search, and Control Centre to the right of the line.\n\nClick the arrow when you’re done. Click it again to open the icons in a row below the menu bar. Arc needs Accessibility permission to find and open those icons. Your apps keep running."
+        alert.informativeText = "Hold Command and drag the icons you want to hide to the left of the vertical line. Keep the line to the left of Arc’s arrow.\n\nKeep Arc’s main icon, battery, Wi-Fi, Search, and Control Centre to the right of the line.\n\nThe island stays hidden while you arrange the icons. Click the arrow when you’re done to bring it back. Click it again to open the icons in a row below the menu bar. Arc needs Accessibility permission to find and open those icons. Your apps keep running."
         alert.addButton(withTitle: "Got It")
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
@@ -244,11 +250,17 @@ extension MenuPocketController {
             print("Menu Pocket native arrow lookup failed:", controller.chevronFrame as Any)
             return false
         }
+        var arrangementChanges: [Bool] = []
+        controller.onArrangementChanged = { arrangementChanges.append($0) }
         for _ in 0..<3 {
+            controller.beginArrangement()
+            guard controller.isArranging, arrangementChanges.last == true else { return false }
+            try? await Task.sleep(for: .milliseconds(300))
             button.performClick(nil)
             try? await Task.sleep(for: .milliseconds(300))
-            guard !controller.isExpanded, (controller.spacer?.length ?? 0) >= 500 else {
-                print("Menu Pocket click did not collapse")
+            guard !controller.isExpanded, !controller.isArranging, arrangementChanges.last == false,
+                  (controller.spacer?.length ?? 0) >= 500 else {
+                print("Menu Pocket click did not collapse:", controller.isExpanded, controller.isArranging, arrangementChanges, controller.spacer?.length as Any)
                 return false
             }
             // Display sleep and wake post this with an unchanged arrangement; it

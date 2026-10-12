@@ -52,6 +52,9 @@ import SwiftUI
         #if DEBUG
         if PrototypeChecks.runIfRequested() { return }
         #endif
+        menuPocket.onArrangementChanged = { [weak coordinator] arranging in
+            coordinator?.setArrangingMenuPocket(arranging)
+        }
         coordinator.menuPocketControlFrame = { [weak menuPocket] in menuPocket?.chevronFrame }
         coordinator.model.setShowsBatteryAlerts(UserDefaults.standard.object(forKey: "showBatteryAlerts") as? Bool ?? true)
         coordinator.model.hideWhenIdle = UserDefaults.standard.bool(forKey: "hideWhenIdle")

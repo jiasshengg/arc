@@ -14,7 +14,7 @@ import Observation
     }
 
     public func setReceivingFiles(_ receiving: Bool) {
-        guard receivingFiles != receiving, !receiving || enabled else { return }
+        guard receivingFiles != receiving, !receiving || (enabled && !isArrangingMenuPocket) else { return }
         receivingFiles = receiving
         if receiving { hoverTask?.cancel(); expanded = true }
         else { collapse() }
@@ -88,9 +88,18 @@ import Observation
     public var displayIsExternalOnly = false
     public var displayIsExternal = false
     public var attachesToTop: Bool { notchSize.height > 0 || displayIsMirrored || displayIsExternalOnly || displayIsExternal }
+    public private(set) var isArrangingMenuPocket = false
+    public func setArrangingMenuPocket(_ arranging: Bool) {
+        isArrangingMenuPocket = arranging
+        if arranging {
+            pointerInside = false
+            receivingFiles = false
+            collapse()
+        }
+    }
     public var hideWhenIdle = false
     public var shouldShowIsland: Bool {
-        enabled && ((!hideWhenIdle && !pausedMediaHidden) || visibleMedia.snapshot != nil || !pocket.items.isEmpty || receivingFiles || activity != nil || screenshotCopied)
+        enabled && !isArrangingMenuPocket && ((!hideWhenIdle && !pausedMediaHidden) || visibleMedia.snapshot != nil || !pocket.items.isEmpty || receivingFiles || activity != nil || screenshotCopied)
     }
     public private(set) var enabled: Bool
     @ObservationIgnored private var hoverTask: Task<Void, Never>?
@@ -117,9 +126,9 @@ import Observation
     public var displayAwake = true
     public var lowPowerMode = false
     public var shouldAnimatePlayback: Bool {
-        enabled && displayAwake && !lowPowerMode && !showsPocket && activity == nil && !screenshotCopied && media.snapshot?.isPlaying == true
+        enabled && !isArrangingMenuPocket && displayAwake && !lowPowerMode && !showsPocket && activity == nil && !screenshotCopied && media.snapshot?.isPlaying == true
     }
-    public var shouldTick: Bool { enabled && displayAwake && expanded && !showsPocket && activity == nil && !screenshotCopied && media.snapshot?.isPlaying == true }
+    public var shouldTick: Bool { enabled && !isArrangingMenuPocket && displayAwake && expanded && !showsPocket && activity == nil && !screenshotCopied && media.snapshot?.isPlaying == true }
 
     public init(enabled: Bool = true, enterDelay: UInt64 = 100_000_000, exitDelay: UInt64 = 100_000_000) {
         self.enabled = enabled

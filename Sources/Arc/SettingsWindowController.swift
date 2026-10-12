@@ -160,9 +160,13 @@ struct SettingsView: View {
                 Text("Click a key combination to change it. Shortcuts work while other apps are active.")
             }
             Section {
-                Toggle("Menu Pocket", isOn: Binding(get: { menuPocket.isEnabled }, set: menuPocket.setEnabled))
-                Button("Arrange Menu Pocket…") { menuPocket.showSetup() }
-                    .disabled(!menuPocket.isEnabled)
+                HStack {
+                    Toggle("Menu Pocket", isOn: Binding(get: { menuPocket.isEnabled }, set: menuPocket.setEnabled))
+                    Button("Arrange…") { menuPocket.showSetup() }
+                        .disabled(!menuPocket.isEnabled)
+                        .help("Arrange Menu Pocket")
+                        .accessibilityLabel("Arrange Menu Pocket")
+                }
                 LabeledContent("Accessibility", value: accessibilityAllowed ? "Allowed" : "Not Allowed")
                 if !accessibilityAllowed {
                     Button("Open Accessibility Settings…") {

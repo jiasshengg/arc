@@ -74,9 +74,10 @@ private final class IslandPanel: NSPanel {
         }
     }
 
-    private func present() {
+    func present() {
         guard !closed else { return }
-        guard coordinator.model.enabled else {
+        guard coordinator.model.enabled, !coordinator.model.isArrangingMenuPocket else {
+            panel.ignoresMouseEvents = true
             panel.orderOut(nil)
             inside = false
             fileDragInProgress = false
@@ -113,7 +114,7 @@ private final class IslandPanel: NSPanel {
     }
 
     private func trackPointer(_ event: NSEvent? = nil) {
-        guard coordinator.model.enabled, coordinator.model.displayAwake else { return }
+        guard coordinator.model.enabled, !coordinator.model.isArrangingMenuPocket, coordinator.model.displayAwake else { return }
         if event?.type == .leftMouseDown { dragPasteboardBaseline = NSPasteboard(name: .drag).changeCount }
         // Read the drag pasteboard only when a new drag is being detected.
         let pasteboard = event?.type == .leftMouseDragged && !fileDragInProgress ? NSPasteboard(name: .drag) : nil

@@ -77,8 +77,9 @@ The settings window has these controls:
   shortcut using Command, Control, or Option, with optional Shift. Escape cancels.
   Conflicting changes to enabled shortcuts keep the previous combination.
 - **Menu Pocket** — hide less important menu bar icons behind an arrow. This is
-  off by default. **Arrange Menu Pocket…**, Accessibility permission status,
-  and a link to Accessibility settings are available here too.
+  off by default. **Arrange…** beside the switch, Accessibility permission status,
+  and a link to Accessibility settings are available here too. The island stays
+  hidden while arranging; click the arrow when finished to restore it.
 - **About Arc** — version/build, GitHub, and Report An Issue links.
 - **Reset Settings…** — restore defaults after confirmation, including disabling
   Launch At Login, Menu Pocket, and shortcuts. Pocket files stay in place.
