@@ -169,11 +169,16 @@ import SwiftUI
                         .frame(width: pocketWindowSize.width, height: pocketWindowSize.height)
                     try snapshot(pocketWindow, size: pocketWindowSize,
                                  to: directory.appendingPathComponent("pocket-window.png"))
-                    let settingsWindow = SettingsView(coordinator: IslandCoordinator(provider: FixtureProvider(), enabled: true),
-                                                      menuPocket: MenuPocketController())
+                    let settingsCoordinator = IslandCoordinator(provider: FixtureProvider(), enabled: true)
+                    let settingsWindow = SettingsView(coordinator: settingsCoordinator,
+                                                      menuPocket: MenuPocketController(),
+                                                      shortcuts: KeyboardShortcutController(coordinator: settingsCoordinator))
                     try snapshot(settingsWindow, size: SettingsWindowController.contentSize,
                                  to: directory.appendingPathComponent("settings-window.png"))
-                    print("Rendered \(fixtures.count + 2) prototype states to \(directory.path)")
+                    let settingsOverviewSize = CGSize(width: 440, height: 1040)
+                    try snapshot(settingsWindow.frame(width: settingsOverviewSize.width, height: settingsOverviewSize.height),
+                                 size: settingsOverviewSize, to: directory.appendingPathComponent("settings-overview.png"))
+                    print("Rendered \(fixtures.count + 3) prototype states to \(directory.path)")
                     exit(0)
                 } catch {
                     fputs("Preview rendering failed: \(error)\n", stderr)

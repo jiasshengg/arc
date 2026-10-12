@@ -5,8 +5,9 @@ import SwiftUI
 @MainActor final class SettingsWindowController: NSWindowController {
     static let contentSize = NSSize(width: 440, height: 540)
 
-    init(coordinator: IslandCoordinator, menuPocket: MenuPocketController) {
-        let view = SettingsView(coordinator: coordinator, menuPocket: menuPocket)
+    init(coordinator: IslandCoordinator, menuPocket: MenuPocketController, shortcuts: KeyboardShortcutController) {
+        let view = SettingsView(coordinator: coordinator, menuPocket: menuPocket, shortcuts: shortcuts)
+            .frame(width: Self.contentSize.width, height: Self.contentSize.height)
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: Self.contentSize),
             styleMask: [.titled, .closable],
@@ -33,6 +34,7 @@ import SwiftUI
 struct SettingsView: View {
     let coordinator: IslandCoordinator
     @ObservedObject var menuPocket: MenuPocketController
+    @ObservedObject var shortcuts: KeyboardShortcutController
     @AppStorage("showBatteryAlerts") private var showBatteryAlerts = true
     @AppStorage("hideWhenIdle") private var hideWhenIdle = false
     @AppStorage("pausedMusicDelay") private var pausedMusicDelay = 0.0
@@ -125,6 +127,17 @@ struct SettingsView: View {
                 Text("Copy saved screenshots, show a brief island preview, or use both.")
             }
             Section {
+                Toggle("Open Pocket (⌃⌥P)", isOn: Binding(get: { shortcuts.openPocketEnabled },
+                    set: { shortcuts.setEnabled($0, for: .openPocket) }))
+                Toggle("Show Or Hide Island (⌃⌥I)", isOn: Binding(get: { shortcuts.toggleIslandEnabled },
+                    set: { shortcuts.setEnabled($0, for: .toggleIsland) }))
+                if let message = shortcuts.errorMessage { Text(message).font(.caption).foregroundStyle(.secondary) }
+            } header: {
+                Text("Keyboard Shortcuts")
+            } footer: {
+                Text("Use Control and Option with the letter shown. Shortcuts work while other apps are active.")
+            }
+            Section {
                 Toggle("Menu Pocket", isOn: Binding(get: { menuPocket.isEnabled }, set: menuPocket.setEnabled))
             } header: {
                 Text("Menu Bar")
@@ -133,8 +146,6 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: SettingsWindowController.contentSize.width,
-               height: SettingsWindowController.contentSize.height)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
             screens = NSScreen.screens
         }

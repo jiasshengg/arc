@@ -52,17 +52,28 @@ Click Arc’s main icon in the menu bar for these options:
 - **Settings…** — open the settings window.
 - **Quit Arc** — close Arc.
 
-The settings window has these switches:
+The settings window has these controls:
 
 - **Show Island** — show or hide the dynamic island.
+- **Display** — choose a monitor or let Arc pick automatically. Disconnected
+  monitors fall back to Automatic until reconnected.
+- **Hide When Idle** — hide the island when it has no content. Off by default.
+- **Expand On Hover** — expand automatically, or turn it off and click to expand.
+  **Hover Delay** offers Fast, Normal, and Slow.
+- **Show Battery Alerts** — show charging and low-battery feedback. On by default.
 - **Launch At Login** — start Arc when you log in. This is off by default.
 - **Show Media From Browsers** — show music and videos playing in browsers such
   as Safari or Chrome. This is on by default. Turn it off to keep the island for
   your music apps.
+- **Hide Paused Music After** — keep paused tracks visible (default), or hide them
+  after 30 seconds, 1 minute, or 5 minutes. Menu playback controls remain available.
 - **Copy Screenshots To Clipboard** — copy newly saved screenshots. This is on
   by default.
 - **Show Screenshot Preview** — briefly preview saved screenshots in the island,
   independently of clipboard copying. This is on by default.
+- **Keyboard Shortcuts** — optionally enable Control-Option-P to open Pocket
+  and Control-Option-I to show or hide the island while other apps are active.
+  Both are off by default.
 - **Menu Pocket** — hide less important menu bar icons behind an arrow. This is
   off by default.
 

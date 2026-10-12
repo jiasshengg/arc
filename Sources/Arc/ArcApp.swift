@@ -42,7 +42,8 @@ import SwiftUI
         showsBrowserMedia: UserDefaults.standard.object(forKey: "showBrowserMedia") as? Bool ?? true,
         showsScreenshotPreview: UserDefaults.standard.object(forKey: "showScreenshotPreview") as? Bool ?? true
     )
-    private lazy var settingsWindow = SettingsWindowController(coordinator: coordinator, menuPocket: menuPocket)
+    private lazy var shortcuts = KeyboardShortcutController(coordinator: coordinator)
+    private lazy var settingsWindow = SettingsWindowController(coordinator: coordinator, menuPocket: menuPocket, shortcuts: shortcuts)
 
     func showSettings() { settingsWindow.show() }
 
@@ -60,8 +61,10 @@ import SwiftUI
         coordinator.model.preferredDisplayID = UserDefaults.standard.string(forKey: "islandDisplayID") ?? ""
         coordinator.start()
         menuPocket.start()
+        shortcuts.start()
     }
     func applicationWillTerminate(_ notification: Notification) {
+        shortcuts.stop()
         menuPocket.stop()
         coordinator.stop()
     }
