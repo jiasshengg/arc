@@ -33,7 +33,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(model.expanded)
     }
 
-    @MainActor func testChangingHoverPreferencesCancelsPendingExpansion() async throws {
+    @MainActor func testChangingHoverPreferencesRestartsPendingExpansion() async throws {
         let model = IslandModel(enterDelay: 30_000_000)
         model.hover(true)
         model.setExpandsOnHover(false)
@@ -46,10 +46,27 @@ final class SettingsTests: XCTestCase {
         XCTAssertFalse(model.expanded)
         model.setHoverDelay(0)
         try await Task.sleep(for: .milliseconds(70))
-        XCTAssertFalse(model.expanded)
+        XCTAssertTrue(model.expanded)
+    }
+
+    @MainActor func testReenablingHoverExpandsWithoutAnotherPointerEvent() async throws {
+        let model = IslandModel(enterDelay: 0)
+        model.setExpandsOnHover(false)
+        model.hover(true)
+        model.setExpandsOnHover(true)
+        try await Task.sleep(for: .milliseconds(20))
+        XCTAssertTrue(model.expanded)
+    }
+
+    @MainActor func testChangingEnterDelayDoesNotCancelPointerExit() async throws {
+        let model = IslandModel(enterDelay: 0, exitDelay: 30_000_000)
         model.hover(true)
         try await Task.sleep(for: .milliseconds(20))
         XCTAssertTrue(model.expanded)
+        model.hover(false)
+        model.setHoverDelay(0.3)
+        try await Task.sleep(for: .milliseconds(60))
+        XCTAssertFalse(model.expanded)
     }
 
     @MainActor func testPausedMusicDeadlineSurvivesMetadataAndResumesOnPlayback() async throws {

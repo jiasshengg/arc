@@ -110,6 +110,7 @@ private final class IslandPanel: NSPanel {
     private func trackPointer() {
         guard coordinator.model.enabled, coordinator.model.displayAwake else { return }
         if !coordinator.model.shouldShowIsland {
+            coordinator.model.hover(false)
             coordinator.model.collapse()
             inside = false
             // Keep the transparent destination available only during a drag.

@@ -93,14 +93,17 @@ import Observation
     }
     public private(set) var enabled: Bool
     @ObservationIgnored private var hoverTask: Task<Void, Never>?
+    @ObservationIgnored private var pointerInside = false
     public private(set) var expandsOnHover = true
     public func setExpandsOnHover(_ expands: Bool) {
         expandsOnHover = expands
-        if !receivingFiles, !draggingFileOut { collapse() }
+        guard !receivingFiles, !draggingFileOut else { return }
+        if !expands { collapse() }
+        else if pointerInside { hover(true) }
     }
     public func setHoverDelay(_ delay: TimeInterval) {
-        hoverTask?.cancel()
         enterDelay = UInt64(min(1, max(0, delay.isFinite ? delay : 0.1)) * 1_000_000_000)
+        if pointerInside { hover(true) }
     }
     public func expand() {
         guard shouldShowIsland else { return }
@@ -139,13 +142,14 @@ import Observation
     }
     public func setEnabled(_ enabled: Bool) {
         self.enabled = enabled
-        if !enabled { receivingFiles = false; collapse(); clearActivity(); clearScreenshotFeedback() }
+        if !enabled { pointerInside = false; receivingFiles = false; collapse(); clearActivity(); clearScreenshotFeedback() }
     }
     public func collapse() {
         hoverTask?.cancel()
         expanded = false
     }
     public func hover(_ inside: Bool) {
+        pointerInside = inside
         hoverTask?.cancel()
         guard shouldShowIsland, !receivingFiles, !draggingFileOut else { return }
         if inside {
@@ -155,7 +159,7 @@ import Observation
         let delay = inside ? enterDelay : exitDelay
         hoverTask = Task { [weak self] in
             do { try await Task.sleep(nanoseconds: delay) } catch { return }
-            guard let self, self.enabled else { return }
+            guard let self, self.shouldShowIsland else { return }
             self.expanded = inside
         }
     }
