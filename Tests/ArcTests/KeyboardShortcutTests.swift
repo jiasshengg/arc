@@ -4,6 +4,26 @@ import Carbon
 @testable import Arc
 
 final class KeyboardShortcutTests: XCTestCase {
+    @MainActor func testStartupKeepsConflictErrorWhenOtherShortcutSucceeds() throws {
+        var reserved: EventHotKeyRef?
+        let status = RegisterEventHotKey(35, UInt32(controlKey | optionKey),
+            EventHotKeyID(signature: 0x54657374, id: 1), GetApplicationEventTarget(), 0, &reserved)
+        guard status == noErr, let reserved else { throw XCTSkip("Pocket shortcut already in use") }
+        defer { UnregisterEventHotKey(reserved) }
+        let suite = "ArcShortcutTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(true, forKey: "shortcutOpenPocket")
+        defaults.set(true, forKey: "shortcutToggleIsland")
+        let coordinator = IslandCoordinator(provider: ShortcutProvider(), enabled: true)
+        let shortcuts = KeyboardShortcutController(coordinator: coordinator, defaults: defaults)
+        defer { shortcuts.stop() }
+        shortcuts.start()
+        guard shortcuts.toggleIslandEnabled else { throw XCTSkip("Island shortcut already in use") }
+        XCTAssertFalse(shortcuts.openPocketEnabled)
+        XCTAssertTrue(shortcuts.errorMessage?.contains("Open Pocket") == true)
+    }
+
     @MainActor func testGlobalShortcutRegistrationPersistenceAndToggle() async throws {
         let suite = "ArcShortcutTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))

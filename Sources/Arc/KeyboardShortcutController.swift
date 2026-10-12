@@ -1,5 +1,4 @@
 import AppKit
-import ArcCore
 import Carbon
 
 @MainActor final class KeyboardShortcutController: ObservableObject {
@@ -26,9 +25,12 @@ import Carbon
     }
 
     func start() {
+        var errors: [String] = []
         for action in Action.allCases where defaults.bool(forKey: action.preference) {
             setEnabled(true, for: action)
+            if let errorMessage { errors.append(errorMessage) }
         }
+        errorMessage = errors.isEmpty ? nil : errors.joined(separator: "\n")
     }
 
     func setEnabled(_ enabled: Bool, for action: Action) {
@@ -48,7 +50,8 @@ import Carbon
                 }
             }
             if !registered {
-                errorMessage = "Couldn’t enable the shortcut. Another app may already use it (error \(status))."
+                let name = action == .openPocket ? "Open Pocket" : "Show Or Hide Island"
+                errorMessage = "Couldn’t enable \(name). Another app may already use it (error \(status))."
             }
         }
         defaults.set(registered, forKey: action.preference)
