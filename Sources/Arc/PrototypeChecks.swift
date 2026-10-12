@@ -181,7 +181,10 @@ import SwiftUI
                     let settingsOverviewSize = CGSize(width: 440, height: 1040)
                     try snapshot(settingsWindow.frame(width: settingsOverviewSize.width, height: settingsOverviewSize.height),
                                  size: settingsOverviewSize, to: directory.appendingPathComponent("settings-overview.png"))
-                    print("Rendered \(fixtures.count + 3) prototype states to \(directory.path)")
+                    let menuPocketSize = CGSize(width: 320, height: 72)
+                    try snapshot(MenuPocketBar.scrollbarPreview().frame(width: menuPocketSize.width, height: menuPocketSize.height),
+                                 size: menuPocketSize, to: directory.appendingPathComponent("menu-pocket-overflow.png"))
+                    print("Rendered \(fixtures.count + 4) prototype states to \(directory.path)")
                     exit(0)
                 } catch {
                     fputs("Preview rendering failed: \(error)\n", stderr)

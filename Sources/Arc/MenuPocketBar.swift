@@ -315,7 +315,7 @@ import SwiftUI
                     Text("No Menu Icons Found. Arrange Menu Pocket To Choose Icons.")
                         .font(.system(size: 12))
                 } else {
-                    ScrollView(.horizontal) {
+                    ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 4) {
                             ForEach(items) { item in
                                 Button {
@@ -346,7 +346,7 @@ import SwiftUI
                             }
                         }
                     }
-                    .scrollIndicators(.hidden)
+                    .scrollIndicators(.never)
                 }
                 Button(action: close) {
                     Image(systemName: "xmark")
@@ -371,6 +371,16 @@ import SwiftUI
 
 #if DEBUG
 extension MenuPocketBar {
+    static func scrollbarPreview() -> some View {
+        let names = ["Teams", "Telegram", "Glide", "ChatGPT", "Music", "Calendar", "Notes", "Finder"]
+        let items = names.enumerated().map { index, name in
+            Item(id: name, element: AXUIElementCreateApplication(getpid()), name: name,
+                 icon: NSImage(systemSymbolName: "app.fill", accessibilityDescription: nil)!, x: CGFloat(index * 60))
+        }
+        return BarView(items: items, trusted: true, requestAccess: {}, open: { _ in true },
+                       failureReason: { nil }, close: {})
+    }
+
     static func diagnose() {
         print("Menu Pocket Accessibility:", AXIsProcessTrusted())
         let bar = MenuPocketBar()
