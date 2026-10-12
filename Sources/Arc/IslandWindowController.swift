@@ -14,6 +14,8 @@ private final class IslandPanel: NSPanel {
     private var localMouse: Any?
     private var globalMouse: Any?
     private var inside = false
+    private var fileDragInProgress = false
+    private var dragPasteboardBaseline = NSPasteboard(name: .drag).changeCount
     private var closed = false
     private var visibleSize = CGSize.zero
 
@@ -49,11 +51,11 @@ private final class IslandPanel: NSPanel {
             Task { @MainActor in self?.present() }
         })
         localMouse = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged, .leftMouseUp, .leftMouseDown, .rightMouseDown]) { [weak self] event in
-            self?.trackPointer()
+            self?.trackPointer(event)
             return event
         }
-        globalMouse = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged, .leftMouseUp, .leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            self?.trackPointer()
+        globalMouse = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged, .leftMouseUp, .leftMouseDown, .rightMouseDown]) { [weak self] event in
+            self?.trackPointer(event)
         }
         panel.acceptsMouseMovedEvents = true
     }
@@ -77,6 +79,7 @@ private final class IslandPanel: NSPanel {
         guard coordinator.model.enabled else {
             panel.orderOut(nil)
             inside = false
+            fileDragInProgress = false
             return
         }
         // Automatic prefers the built-in notch; disconnected choices fall back to Automatic.
@@ -107,14 +110,21 @@ private final class IslandPanel: NSPanel {
         trackPointer()
     }
 
-    private func trackPointer() {
+    private func trackPointer(_ event: NSEvent? = nil) {
         guard coordinator.model.enabled, coordinator.model.displayAwake else { return }
+        if event?.type == .leftMouseDown { dragPasteboardBaseline = NSPasteboard(name: .drag).changeCount }
+        // Read the drag pasteboard only when a new drag is being detected.
+        let pasteboard = event?.type == .leftMouseDragged && !fileDragInProgress ? NSPasteboard(name: .drag) : nil
+        fileDragInProgress = Self.isFileDrag(previous: fileDragInProgress, eventType: event?.type,
+                                             leftButtonDown: NSEvent.pressedMouseButtons & 1 != 0,
+                                             pasteboardChanged: pasteboard.map { $0.changeCount != dragPasteboardBaseline } ?? false,
+                                             pasteboardTypes: pasteboard?.types ?? [])
         if !coordinator.model.shouldShowIsland {
             coordinator.model.hover(false)
             coordinator.model.collapse()
             inside = false
             // Keep the transparent destination available only during a drag.
-            if NSEvent.pressedMouseButtons & 1 == 0 {
+            if !fileDragInProgress {
                 panel.ignoresMouseEvents = true
                 return
             }
@@ -136,6 +146,13 @@ private final class IslandPanel: NSPanel {
             inside = nowInside
             coordinator.model.hover(nowInside)
         }
+    }
+
+    static func isFileDrag(previous: Bool, eventType: NSEvent.EventType?, leftButtonDown: Bool,
+                           pasteboardChanged: Bool, pasteboardTypes: [NSPasteboard.PasteboardType]) -> Bool {
+        guard leftButtonDown, eventType != .leftMouseDown, eventType != .leftMouseUp else { return false }
+        if previous { return true }
+        return eventType == .leftMouseDragged && pasteboardChanged && pasteboardTypes.contains(.fileURL)
     }
 
     static func displayIdentifier(_ screen: NSScreen) -> String {
