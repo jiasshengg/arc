@@ -133,6 +133,7 @@ import Observation
         // Metadata refreshes for the same paused track must not restart the deadline.
         if let previous, let current, !previous.isPlaying, !current.isPlaying,
            previous.title == current.title, previous.artist == current.artist,
+           previous.album == current.album, previous.duration == current.duration,
            previous.appBundleIdentifier == current.appBundleIdentifier { return }
         schedulePausedMusicHiding()
     }

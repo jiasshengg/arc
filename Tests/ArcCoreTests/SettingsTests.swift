@@ -94,6 +94,22 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(model.visibleMedia, .media(paused))
     }
 
+    @MainActor func testPausedTracksWithSameTitleFromDifferentAlbumsGetNewDeadline() async throws {
+        let model = IslandModel()
+        model.setPausedMusicDelay(0.03)
+        model.receive(.media(NowPlayingSnapshot(title: "Intro", artist: "Artist", album: "First", duration: 60)))
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertTrue(model.pausedMediaHidden)
+        model.receive(.media(NowPlayingSnapshot(title: "Intro", artist: "Artist", album: "Second", duration: 90)))
+        XCTAssertFalse(model.pausedMediaHidden)
+        XCTAssertTrue(model.shouldShowIsland)
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertTrue(model.pausedMediaHidden)
+        model.receive(.media(NowPlayingSnapshot(title: "Intro", artist: "Artist", album: "Second", duration: 120)))
+        XCTAssertFalse(model.pausedMediaHidden)
+        model.receive(.idle)
+    }
+
     @MainActor func testPausedMusicTimerCancelsForNewTrackAndIdle() async throws {
         let model = IslandModel()
         model.setPausedMusicDelay(0.06)
