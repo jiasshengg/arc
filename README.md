@@ -7,9 +7,9 @@ macOS 14 and later. A small island sits beside your MacBook’s notch and expand
 when you move your pointer over it, showing music controls, files you’ve set
 aside, and brief updates such as charging or a copied screenshot.
 
-On a Mac without a notch, the island sits just below the menu bar. On a
-mirrored display, it sits at the top of the screen. Everything runs locally,
-with no account, subscription, or usage tracking.
+On a built-in display without a notch, the island sits just below the menu bar.
+On external or mirrored displays, it attaches to the top of the screen.
+Everything runs locally, with no account, subscription, or usage tracking.
 
 ## Features
 
@@ -30,13 +30,31 @@ In the menu bar:
 See [Known Limits](#known-limits) for compatibility and testing details across
 different Macs and media apps.
 
+## What’s New In 1.1.0
+
+- A dedicated settings window for display selection, hover behavior, idle hiding,
+  paused music timeout, battery alerts, and Launch At Login.
+- Independent screenshot copying and previews, plus a switch for browser media.
+- Optional global shortcuts with custom key combinations and conflict checks.
+- Menu Pocket setup and permission status in settings. The island hides while
+  you arrange icons, and the separate icon row has larger icons with no scrollbar.
+- About links, a confirmed settings reset, and a styled drag-to-Applications DMG.
+- Fixes for external display placement, hover preference changes, paused tracks,
+  shortcut errors, and clicks passing through a hidden island.
+
+See [the changelog](CHANGELOG.md) for release details.
+
 ## Install
 
 1. Download the DMG from [Releases](https://github.com/jiasshengg/arc/releases).
 2. Open the DMG and copy Arc to Applications.
 3. Launch Arc from Applications. Its icon appears in the menu bar.
 
-The DMG does not require Xcode, Homebrew, or terminal commands.
+The DMG does not require Xcode, Homebrew, or terminal commands. Published DMGs
+currently target Apple Silicon; Intel builds still need testing.
+
+Arc runs from the menu bar, so it does not appear in the Dock or Command-Tab.
+Open its menu to access Settings or quit the app.
 
 ## Music Controls
 
@@ -51,6 +69,11 @@ Click Arc’s main icon in the menu bar for these options:
 - **Open Pocket…** — open your temporary file list.
 - **Settings…** — open the settings window.
 - **Quit Arc** — close Arc.
+
+## Settings
+
+Choose **Settings…** from Arc’s menu, or press **Command-Comma** while Arc is
+active. Changes apply immediately and are saved locally.
 
 The settings window has these controls:
 
@@ -77,13 +100,13 @@ The settings window has these controls:
   shortcut using Command, Control, or Option, with optional Shift. Escape cancels.
   Conflicting changes to enabled shortcuts keep the previous combination.
 - **Menu Pocket** — hide less important menu bar icons behind an arrow. This is
-  off by default. **Arrange** beside the Menu Bar heading, Accessibility permission status,
-  and a link to Accessibility settings are available here too. The island stays
-  hidden while arranging; click the arrow when finished to restore it.
+  off by default. **Arrange** beside the Menu Bar heading, Accessibility
+  permission status, and a link to Accessibility settings are available here too.
+  The island stays hidden while arranging; click the arrow when finished to restore it.
 - **About Arc** — version/build, GitHub, and Report An Issue links.
 - **Reset Settings** — standalone button at the bottom-right of the window.
-  Restore defaults after confirmation, including disabling
-  Launch At Login, Menu Pocket, and shortcuts. Pocket files stay in place.
+  Restore defaults after confirmation, including disabling Launch At Login,
+  Menu Pocket, and shortcuts. Files held in Pocket stay in place.
 
 Keep Arc in a permanent folder before turning on **Launch At Login**. macOS
 may ask you to allow it in System Settings.
@@ -224,7 +247,7 @@ Perl. The helper sends music details and playback commands. If it fails, use
 
 Battery updates use IOKit. Screenshot copying watches the saved screenshot
 folder and checks the file information macOS adds to screenshots. These checks
-pause during sleep. Battery monitoring also pauses when the island is hidden.
+pause during sleep.
 
 ### Run Checks
 
@@ -249,7 +272,8 @@ The extra command options above are available in debug builds only. Tests cover
 music details, playback progress, show/hide behavior, file handling, and layout.
 Menu Pocket checks also cover native event routing, cursor restoration decisions,
 and grouping after the divider moves. The native smoke check exercises Arc’s
-buttons and layout; it does not verify opening real third-party app menus.
+buttons, arrangement visibility, and layout; it does not verify opening real
+third-party app menus.
 The sample images include playing, paused, empty, error, screenshot, and Pocket
 states.
 
@@ -266,7 +290,8 @@ states.
   can’t show a paused music app instead, so the island stays empty. Web apps
   installed from Chrome count as a browser.
 - Timers, AirPods features, general notifications, and extra islands aren’t included.
-- Automatic updates and release packaging aren’t automated yet.
+- Automatic updates are not available. DMG packaging is scripted; publishing
+  releases is still manual.
 
 ## License
 
