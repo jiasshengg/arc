@@ -22,13 +22,18 @@ import Observation
 
     public private(set) var media: MediaState = .idle
     public private(set) var expanded = false
+    public private(set) var showsBatteryAlerts = true
+    public func setShowsBatteryAlerts(_ shows: Bool) {
+        showsBatteryAlerts = shows
+        if !shows { clearActivity() }
+    }
     public private(set) var activity: SystemActivity?
     @ObservationIgnored private var activityTask: Task<Void, Never>?
     public private(set) var screenshotCopied = false
     @ObservationIgnored private var screenshotTask: Task<Void, Never>?
 
     public func showActivity(_ activity: SystemActivity, duration: UInt64 = 1_500_000_000) {
-        guard enabled else { return }
+        guard enabled, showsBatteryAlerts else { return }
         activityTask?.cancel()
         self.activity = activity
         activityTask = Task { [weak self] in

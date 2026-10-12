@@ -51,6 +51,7 @@ import SwiftUI
         if PrototypeChecks.runIfRequested() { return }
         #endif
         coordinator.menuPocketControlFrame = { [weak menuPocket] in menuPocket?.chevronFrame }
+        coordinator.model.setShowsBatteryAlerts(UserDefaults.standard.object(forKey: "showBatteryAlerts") as? Bool ?? true)
         coordinator.start()
         menuPocket.start()
     }
