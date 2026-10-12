@@ -140,17 +140,17 @@ import SwiftUI
 
     private func icon(for app: NSRunningApplication, name: String) -> NSImage {
         let source = app.icon ?? NSImage(systemSymbolName: "app", accessibilityDescription: name) ?? NSImage()
-        guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 48, pixelsHigh: 48,
+        guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 56, pixelsHigh: 56,
                                            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
                                            isPlanar: false, colorSpaceName: .deviceRGB,
                                            bytesPerRow: 0, bitsPerPixel: 0),
               let context = NSGraphicsContext(bitmapImageRep: bitmap) else { return source }
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = context
-        source.draw(in: CGRect(x: 0, y: 0, width: 48, height: 48))
+        source.draw(in: CGRect(x: 0, y: 0, width: 56, height: 56))
         context.flushGraphics()
         NSGraphicsContext.restoreGraphicsState()
-        bitmap.size = NSSize(width: 24, height: 24)
+        bitmap.size = NSSize(width: 28, height: 28)
         let image = NSImage(size: bitmap.size)
         image.addRepresentation(bitmap)
         return image
@@ -331,7 +331,7 @@ import SwiftUI
                                         Image(nsImage: item.icon)
                                             .resizable()
                                             .interpolation(.high)
-                                            .frame(width: 24, height: 24)
+                                            .frame(width: 28, height: 28)
                                         Text(item.name)
                                             .font(.system(size: 9))
                                             .lineLimit(1)
