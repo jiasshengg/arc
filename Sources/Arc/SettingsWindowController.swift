@@ -160,13 +160,7 @@ struct SettingsView: View {
                 Text("Click a key combination to change it. Shortcuts work while other apps are active.")
             }
             Section {
-                HStack {
-                    Toggle("Menu Pocket", isOn: Binding(get: { menuPocket.isEnabled }, set: menuPocket.setEnabled))
-                    Button("Arrange…") { menuPocket.showSetup() }
-                        .disabled(!menuPocket.isEnabled)
-                        .help("Arrange Menu Pocket")
-                        .accessibilityLabel("Arrange Menu Pocket")
-                }
+                Toggle("Menu Pocket", isOn: Binding(get: { menuPocket.isEnabled }, set: menuPocket.setEnabled))
                 LabeledContent("Accessibility", value: accessibilityAllowed ? "Allowed" : "Not Allowed")
                 if !accessibilityAllowed {
                     Button("Open Accessibility Settings…") {
@@ -174,7 +168,15 @@ struct SettingsView: View {
                     }
                 }
             } header: {
-                Text("Menu Bar")
+                HStack {
+                    Text("Menu Bar")
+                    Spacer()
+                    Button("Arrange…") { menuPocket.showSetup() }
+                        .buttonStyle(.borderless)
+                        .disabled(!menuPocket.isEnabled)
+                        .help("Arrange Menu Pocket")
+                        .accessibilityLabel("Arrange Menu Pocket")
+                }
             } footer: {
                 Text("Keep less important menu bar icons behind an arrow. Allow Arc in Accessibility settings to find and open those icons.")
             }
