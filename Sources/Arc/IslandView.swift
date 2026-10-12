@@ -109,6 +109,8 @@ struct IslandView: View {
         .accessibilityLabel("Arc Island")
         .accessibilityAction(named: "Expand Island") { model.hover(true) }
         .accessibilityAction(named: "Minimize Island") { model.collapse() }
+        .opacity(model.shouldShowIsland ? 1 : 0)
+        .accessibilityHidden(!model.shouldShowIsland)
         .preferredColorScheme(.dark)
     }
 

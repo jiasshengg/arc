@@ -62,6 +62,7 @@ private final class IslandPanel: NSPanel {
         guard !closed else { return }
         withObservationTracking {
             _ = coordinator.model.enabled
+            _ = coordinator.model.shouldShowIsland
         } onChange: { [weak self] in
             Task { @MainActor in
                 self?.present()
@@ -104,6 +105,15 @@ private final class IslandPanel: NSPanel {
 
     private func trackPointer() {
         guard coordinator.model.enabled, coordinator.model.displayAwake else { return }
+        if !coordinator.model.shouldShowIsland {
+            coordinator.model.collapse()
+            inside = false
+            // Keep the transparent destination available only during a drag.
+            if NSEvent.pressedMouseButtons & 1 == 0 {
+                panel.ignoresMouseEvents = true
+                return
+            }
+        }
         let point = NSEvent.mouseLocation
         let attached = coordinator.model.attachesToTop
         let rect = CGRect(x: panel.frame.midX - visibleSize.width / 2,

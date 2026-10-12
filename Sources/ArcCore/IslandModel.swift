@@ -66,6 +66,10 @@ import Observation
     public var displayIsMirrored = false
     public var displayIsExternalOnly = false
     public var attachesToTop: Bool { notchSize.height > 0 || displayIsMirrored || displayIsExternalOnly }
+    public var hideWhenIdle = false
+    public var shouldShowIsland: Bool {
+        enabled && (!hideWhenIdle || media.snapshot != nil || !pocket.items.isEmpty || receivingFiles || activity != nil || screenshotCopied)
+    }
     public private(set) var enabled: Bool
     @ObservationIgnored private var hoverTask: Task<Void, Never>?
     @ObservationIgnored private let enterDelay: UInt64
@@ -98,7 +102,7 @@ import Observation
     }
     public func hover(_ inside: Bool) {
         hoverTask?.cancel()
-        guard enabled, !receivingFiles, !draggingFileOut else { return }
+        guard shouldShowIsland, !receivingFiles, !draggingFileOut else { return }
         if inside { pocket.refresh() }
         let delay = inside ? enterDelay : exitDelay
         hoverTask = Task { [weak self] in

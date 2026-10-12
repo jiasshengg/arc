@@ -34,6 +34,7 @@ struct SettingsView: View {
     let coordinator: IslandCoordinator
     @ObservedObject var menuPocket: MenuPocketController
     @AppStorage("showBatteryAlerts") private var showBatteryAlerts = true
+    @AppStorage("hideWhenIdle") private var hideWhenIdle = false
     @AppStorage("showIsland") private var showIsland = true
     @AppStorage("copyScreenshots") private var copyScreenshots = true
     @AppStorage("showBrowserMedia") private var showBrowserMedia = true
@@ -46,6 +47,8 @@ struct SettingsView: View {
             Section("General") {
                 Toggle("Show Island", isOn: $showIsland)
                     .onChange(of: showIsland) { _, enabled in coordinator.setEnabled(enabled) }
+                Toggle("Hide When Idle", isOn: $hideWhenIdle)
+                    .onChange(of: hideWhenIdle) { _, hide in coordinator.model.hideWhenIdle = hide }
                 Toggle("Show Battery Alerts", isOn: $showBatteryAlerts)
                     .onChange(of: showBatteryAlerts) { _, shows in coordinator.model.setShowsBatteryAlerts(shows) }
                 Toggle("Launch At Login", isOn: Binding(get: { loginEnabled }, set: setLogin))
