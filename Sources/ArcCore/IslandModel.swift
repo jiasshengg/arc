@@ -21,6 +21,26 @@ import Observation
     }
 
     public private(set) var media: MediaState = .idle
+    public private(set) var pausedMediaHidden = false
+    public var visibleMedia: MediaState { pausedMediaHidden ? .idle : media }
+    @ObservationIgnored private var pausedMediaTask: Task<Void, Never>?
+    @ObservationIgnored private var pausedMusicDelay: TimeInterval = 0
+
+    public func setPausedMusicDelay(_ delay: TimeInterval) {
+        pausedMusicDelay = delay.isFinite ? max(0, delay) : 0
+        schedulePausedMusicHiding()
+    }
+
+    private func schedulePausedMusicHiding() {
+        pausedMediaTask?.cancel()
+        pausedMediaHidden = false
+        guard pausedMusicDelay > 0, media.snapshot?.isPlaying == false else { return }
+        let delay = pausedMusicDelay
+        pausedMediaTask = Task { [weak self] in
+            do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+            self?.pausedMediaHidden = true
+        }
+    }
     public private(set) var expanded = false
     public private(set) var showsBatteryAlerts = true
     public func setShowsBatteryAlerts(_ shows: Bool) {
@@ -68,7 +88,7 @@ import Observation
     public var attachesToTop: Bool { notchSize.height > 0 || displayIsMirrored || displayIsExternalOnly }
     public var hideWhenIdle = false
     public var shouldShowIsland: Bool {
-        enabled && (!hideWhenIdle || media.snapshot != nil || !pocket.items.isEmpty || receivingFiles || activity != nil || screenshotCopied)
+        enabled && ((!hideWhenIdle && !pausedMediaHidden) || visibleMedia.snapshot != nil || !pocket.items.isEmpty || receivingFiles || activity != nil || screenshotCopied)
     }
     public private(set) var enabled: Bool
     @ObservationIgnored private var hoverTask: Task<Void, Never>?
@@ -87,7 +107,16 @@ import Observation
         self.exitDelay = exitDelay
     }
 
-    public func receive(_ state: MediaState) { media = state }
+    public func receive(_ state: MediaState) {
+        let previous = media.snapshot
+        media = state
+        let current = state.snapshot
+        // Metadata refreshes for the same paused track must not restart the deadline.
+        if let previous, let current, !previous.isPlaying, !current.isPlaying,
+           previous.title == current.title, previous.artist == current.artist,
+           previous.appBundleIdentifier == current.appBundleIdentifier { return }
+        schedulePausedMusicHiding()
+    }
     public func seek(to position: TimeInterval, at date: Date = Date()) {
         guard let snapshot = media.snapshot, snapshot.duration != nil else { return }
         media = .media(snapshot.seeking(to: position, at: date))

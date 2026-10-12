@@ -25,7 +25,7 @@ struct IslandView: View {
         if model.activity != nil {
             return IslandLayout.activitySize(expanded: model.expanded, notch: model.notchSize)
         }
-        return IslandLayout.size(expanded: model.expanded, hasMedia: model.media.snapshot != nil, notch: model.notchSize)
+        return IslandLayout.size(expanded: model.expanded, hasMedia: model.visibleMedia.snapshot != nil, notch: model.notchSize)
     }
     private var outline: UnevenRoundedRectangle {
         UnevenRoundedRectangle(
@@ -82,7 +82,7 @@ struct IslandView: View {
                 }
             } else if model.expanded {
                 Group {
-                    if let track = model.media.snapshot { expanded(track) }
+                    if let track = model.visibleMedia.snapshot { expanded(track) }
                     else { empty.frame(height: 100) }
                 }
                 // Keep full-size content stable while the surrounding shape opens.
@@ -231,7 +231,7 @@ struct IslandView: View {
     }
 
     @ViewBuilder private var compact: some View {
-        if let track = model.media.snapshot {
+        if let track = model.visibleMedia.snapshot {
             if attached {
                 Button(action: coordinator.openMediaApp) {
                     HStack(spacing: 0) {
@@ -357,12 +357,12 @@ struct IslandView: View {
 
     private var empty: some View {
         HStack(spacing: 14) {
-            Image(systemName: model.media == .unavailable ? "antenna.radiowaves.left.and.right.slash" : "music.note")
+            Image(systemName: model.visibleMedia == .unavailable ? "antenna.radiowaves.left.and.right.slash" : "music.note")
                 .font(.system(size: 24)).foregroundStyle(accent)
             VStack(alignment: .leading, spacing: 5) {
-                Text(model.media == .unavailable ? "Can’t Connect To Your Music" : "Your Music, Close By")
+                Text(model.visibleMedia == .unavailable ? "Can’t Connect To Your Music" : "Your Music, Close By")
                     .font(.system(size: 13, weight: .semibold))
-                Text(model.media == .unavailable ? "Choose Try Connecting Again in Arc’s menu." : "Play something to get started.")
+                Text(model.visibleMedia == .unavailable ? "Choose Try Connecting Again in Arc’s menu." : "Play something to get started.")
                     .font(.system(size: 11)).foregroundStyle(.white.opacity(0.5))
             }
         }.padding(20)

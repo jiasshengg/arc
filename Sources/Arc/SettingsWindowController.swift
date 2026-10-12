@@ -35,6 +35,7 @@ struct SettingsView: View {
     @ObservedObject var menuPocket: MenuPocketController
     @AppStorage("showBatteryAlerts") private var showBatteryAlerts = true
     @AppStorage("hideWhenIdle") private var hideWhenIdle = false
+    @AppStorage("pausedMusicDelay") private var pausedMusicDelay = 0.0
     @AppStorage("showIsland") private var showIsland = true
     @AppStorage("copyScreenshots") private var copyScreenshots = true
     @AppStorage("showBrowserMedia") private var showBrowserMedia = true
@@ -76,6 +77,13 @@ struct SettingsView: View {
                     .onChange(of: showBrowserMedia) { _, enabled in
                         Task { await coordinator.setShowsBrowserMedia(enabled) }
                     }
+                Picker("Hide Paused Music After", selection: $pausedMusicDelay) {
+                    Text("Keep Visible").tag(0.0)
+                    Text("30 Seconds").tag(30.0)
+                    Text("1 Minute").tag(60.0)
+                    Text("5 Minutes").tag(300.0)
+                }
+                .onChange(of: pausedMusicDelay) { _, delay in coordinator.model.setPausedMusicDelay(delay) }
             } header: {
                 Text("Music")
             } footer: {

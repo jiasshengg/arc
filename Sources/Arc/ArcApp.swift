@@ -53,6 +53,7 @@ import SwiftUI
         coordinator.menuPocketControlFrame = { [weak menuPocket] in menuPocket?.chevronFrame }
         coordinator.model.setShowsBatteryAlerts(UserDefaults.standard.object(forKey: "showBatteryAlerts") as? Bool ?? true)
         coordinator.model.hideWhenIdle = UserDefaults.standard.bool(forKey: "hideWhenIdle")
+        coordinator.model.setPausedMusicDelay(UserDefaults.standard.double(forKey: "pausedMusicDelay"))
         coordinator.start()
         menuPocket.start()
     }
