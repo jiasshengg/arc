@@ -346,7 +346,7 @@ import SwiftUI
                             }
                         }
                     }
-                    .scrollIndicators(.visible)
+                    .scrollIndicators(.hidden)
                 }
                 Button(action: close) {
                     Image(systemName: "xmark")
