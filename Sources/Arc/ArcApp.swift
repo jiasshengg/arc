@@ -54,6 +54,8 @@ import SwiftUI
         coordinator.model.setShowsBatteryAlerts(UserDefaults.standard.object(forKey: "showBatteryAlerts") as? Bool ?? true)
         coordinator.model.hideWhenIdle = UserDefaults.standard.bool(forKey: "hideWhenIdle")
         coordinator.model.setPausedMusicDelay(UserDefaults.standard.double(forKey: "pausedMusicDelay"))
+        coordinator.model.setExpandsOnHover(UserDefaults.standard.object(forKey: "expandOnHover") as? Bool ?? true)
+        coordinator.model.setHoverDelay(UserDefaults.standard.object(forKey: "hoverDelay") as? Double ?? 0.1)
         coordinator.start()
         menuPocket.start()
     }

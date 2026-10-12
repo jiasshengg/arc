@@ -92,7 +92,22 @@ import Observation
     }
     public private(set) var enabled: Bool
     @ObservationIgnored private var hoverTask: Task<Void, Never>?
-    @ObservationIgnored private let enterDelay: UInt64
+    public private(set) var expandsOnHover = true
+    public func setExpandsOnHover(_ expands: Bool) {
+        expandsOnHover = expands
+        if !receivingFiles, !draggingFileOut { collapse() }
+    }
+    public func setHoverDelay(_ delay: TimeInterval) {
+        hoverTask?.cancel()
+        enterDelay = UInt64(min(1, max(0, delay.isFinite ? delay : 0.1)) * 1_000_000_000)
+    }
+    public func expand() {
+        guard shouldShowIsland else { return }
+        hoverTask?.cancel()
+        pocket.refresh()
+        expanded = true
+    }
+    @ObservationIgnored private var enterDelay: UInt64
     @ObservationIgnored private let exitDelay: UInt64
     public var displayAwake = true
     public var lowPowerMode = false
@@ -132,7 +147,10 @@ import Observation
     public func hover(_ inside: Bool) {
         hoverTask?.cancel()
         guard shouldShowIsland, !receivingFiles, !draggingFileOut else { return }
-        if inside { pocket.refresh() }
+        if inside {
+            guard expandsOnHover else { return }
+            pocket.refresh()
+        }
         let delay = inside ? enterDelay : exitDelay
         hoverTask = Task { [weak self] in
             do { try await Task.sleep(nanoseconds: delay) } catch { return }

@@ -2,6 +2,46 @@ import XCTest
 @testable import ArcCore
 
 final class SettingsTests: XCTestCase {
+    @MainActor func testHoverOffAllowsExplicitExpansionAndDragEntry() async throws {
+        let model = IslandModel(enterDelay: 0, exitDelay: 0)
+        model.setExpandsOnHover(false)
+        model.hover(true)
+        try await Task.sleep(for: .milliseconds(20))
+        XCTAssertFalse(model.expanded)
+        model.expand()
+        XCTAssertTrue(model.expanded)
+        model.hover(false)
+        try await Task.sleep(for: .milliseconds(20))
+        XCTAssertFalse(model.expanded)
+        model.setReceivingFiles(true)
+        XCTAssertTrue(model.expanded)
+        model.setExpandsOnHover(true)
+        XCTAssertTrue(model.expanded)
+        model.setReceivingFiles(false)
+        model.hover(true)
+        try await Task.sleep(for: .milliseconds(20))
+        XCTAssertTrue(model.expanded)
+    }
+
+    @MainActor func testChangingHoverPreferencesCancelsPendingExpansion() async throws {
+        let model = IslandModel(enterDelay: 30_000_000)
+        model.hover(true)
+        model.setExpandsOnHover(false)
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertFalse(model.expanded)
+        model.setExpandsOnHover(true)
+        model.setHoverDelay(0.08)
+        model.hover(true)
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertFalse(model.expanded)
+        model.setHoverDelay(0)
+        try await Task.sleep(for: .milliseconds(70))
+        XCTAssertFalse(model.expanded)
+        model.hover(true)
+        try await Task.sleep(for: .milliseconds(20))
+        XCTAssertTrue(model.expanded)
+    }
+
     @MainActor func testPausedMusicDeadlineSurvivesMetadataAndResumesOnPlayback() async throws {
         let model = IslandModel()
         model.setPausedMusicDelay(0.06)

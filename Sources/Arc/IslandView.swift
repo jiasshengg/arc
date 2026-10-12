@@ -101,13 +101,21 @@ struct IslandView: View {
         .foregroundStyle(.white)
         .clipShape(outline)
         .overlay { outline.strokeBorder(.white.opacity(model.attachesToTop ? 0 : 0.10), lineWidth: 0.5) }
+        .overlay {
+            if !model.expanded && !model.expandsOnHover {
+                Button(action: model.expand) { Color.clear.contentShape(Rectangle()) }
+                    .buttonStyle(.plain)
+                    .help("Expand Island")
+                    .accessibilityLabel("Expand Island")
+            }
+        }
         .onGeometryChange(for: CGSize.self) { $0.size } action: { onSizeChange($0) }
         .animation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: model.expanded ? 0.42 : 0.28, dampingFraction: 0.88), value: size)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .ignoresSafeArea()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Arc Island")
-        .accessibilityAction(named: "Expand Island") { model.hover(true) }
+        .accessibilityAction(named: "Expand Island") { model.expand() }
         .accessibilityAction(named: "Minimize Island") { model.collapse() }
         .opacity(model.shouldShowIsland ? 1 : 0)
         .accessibilityHidden(!model.shouldShowIsland)

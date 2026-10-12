@@ -36,6 +36,8 @@ struct SettingsView: View {
     @AppStorage("showBatteryAlerts") private var showBatteryAlerts = true
     @AppStorage("hideWhenIdle") private var hideWhenIdle = false
     @AppStorage("pausedMusicDelay") private var pausedMusicDelay = 0.0
+    @AppStorage("expandOnHover") private var expandOnHover = true
+    @AppStorage("hoverDelay") private var hoverDelay = 0.1
     @AppStorage("showIsland") private var showIsland = true
     @AppStorage("copyScreenshots") private var copyScreenshots = true
     @AppStorage("showBrowserMedia") private var showBrowserMedia = true
@@ -50,6 +52,16 @@ struct SettingsView: View {
                     .onChange(of: showIsland) { _, enabled in coordinator.setEnabled(enabled) }
                 Toggle("Hide When Idle", isOn: $hideWhenIdle)
                     .onChange(of: hideWhenIdle) { _, hide in coordinator.model.hideWhenIdle = hide }
+                Toggle("Expand On Hover", isOn: $expandOnHover)
+                    .onChange(of: expandOnHover) { _, expands in coordinator.model.setExpandsOnHover(expands) }
+                Picker("Hover Delay", selection: $hoverDelay) {
+                    Text("Fast").tag(0.1)
+                    Text("Normal").tag(0.3)
+                    Text("Slow").tag(0.6)
+                }
+                .disabled(!expandOnHover)
+                .onChange(of: hoverDelay) { _, delay in coordinator.model.setHoverDelay(delay) }
+                if !expandOnHover { Text("Click the island to expand it.").font(.caption).foregroundStyle(.secondary) }
                 Toggle("Show Battery Alerts", isOn: $showBatteryAlerts)
                     .onChange(of: showBatteryAlerts) { _, shows in coordinator.model.setShowsBatteryAlerts(shows) }
                 Toggle("Launch At Login", isOn: Binding(get: { loginEnabled }, set: setLogin))
