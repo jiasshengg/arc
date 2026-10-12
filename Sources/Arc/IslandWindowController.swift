@@ -94,6 +94,8 @@ private final class IslandPanel: NSPanel {
         let displayID = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
         let mirrored = displayID.map { CGDisplayIsInMirrorSet($0) != 0 } ?? false
         coordinator.model.displayIsMirrored = mirrored
+        let external = displayID.map { CGDisplayIsBuiltin($0) == 0 } ?? false
+        coordinator.model.displayIsExternal = external
         // A closed-lid desktop has no built-in screen; keep the island at the monitor's top edge.
         let externalOnly = !screens.contains { screen in
             guard let id = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value else { return true }
@@ -104,7 +106,7 @@ private final class IslandPanel: NSPanel {
         var canvas = IslandLayout.pocketSize(expanded: true, count: Pocket.islandCapacity, receiving: false, notch: notch)
         canvas.width += 24
         canvas.height += 16
-        let frame = IslandLayout.frame(screen: screen.frame, visible: screen.visibleFrame, safeTop: notch.height, size: canvas, mirrored: mirrored, externalOnly: externalOnly)
+        let frame = IslandLayout.frame(screen: screen.frame, visible: screen.visibleFrame, safeTop: notch.height, size: canvas, mirrored: mirrored, externalOnly: externalOnly, external: external)
         if panel.frame != frame { panel.setFrame(frame, display: true) }
         panel.orderFrontRegardless()
         trackPointer()

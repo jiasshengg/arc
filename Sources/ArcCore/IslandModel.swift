@@ -86,7 +86,8 @@ import Observation
     public var preferredDisplayID = ""
     public var displayIsMirrored = false
     public var displayIsExternalOnly = false
-    public var attachesToTop: Bool { notchSize.height > 0 || displayIsMirrored || displayIsExternalOnly }
+    public var displayIsExternal = false
+    public var attachesToTop: Bool { notchSize.height > 0 || displayIsMirrored || displayIsExternalOnly || displayIsExternal }
     public var hideWhenIdle = false
     public var shouldShowIsland: Bool {
         enabled && ((!hideWhenIdle && !pausedMediaHidden) || visibleMedia.snapshot != nil || !pocket.items.isEmpty || receivingFiles || activity != nil || screenshotCopied)
@@ -199,8 +200,8 @@ public enum IslandLayout {
         return CGSize(width: max(280, notch.width + 88), height: notch.height + 64)
     }
 
-    public static func frame(screen: CGRect, visible: CGRect, safeTop: CGFloat, size: CGSize, mirrored: Bool = false, externalOnly: Bool = false) -> CGRect {
-        let top = safeTop > 0 || mirrored || externalOnly ? screen.maxY : visible.maxY - 8
+    public static func frame(screen: CGRect, visible: CGRect, safeTop: CGFloat, size: CGSize, mirrored: Bool = false, externalOnly: Bool = false, external: Bool = false) -> CGRect {
+        let top = safeTop > 0 || mirrored || externalOnly || external ? screen.maxY : visible.maxY - 8
         let width = min(size.width, screen.width)
         return CGRect(x: screen.midX - width / 2, y: top - size.height, width: width, height: size.height)
     }

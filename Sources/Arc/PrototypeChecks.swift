@@ -96,6 +96,8 @@ import SwiftUI
                         ("idle-expanded", .idle, true),
                         ("playing-compact", .media(track()), false),
                         ("playing-expanded", .media(track()), true),
+                        ("external-compact", .media(track()), false),
+                        ("external-expanded", .media(track()), true),
                         ("mirrored-compact", .media(track()), false),
                         ("mirrored-expanded", .media(track()), true),
                         ("paused-expanded", .media(track(playing: false)), true),
@@ -125,6 +127,7 @@ import SwiftUI
                         let notch = name.hasPrefix("notch-") ? CGSize(width: 192, height: 32) : .zero
                         coordinator.model.setNotchSize(notch)
                         coordinator.model.displayIsMirrored = name.hasPrefix("mirrored-")
+                        coordinator.model.displayIsExternal = name.hasPrefix("external-")
                         coordinator.model.receive(state)
                         if expanded {
                             coordinator.model.hover(true)
