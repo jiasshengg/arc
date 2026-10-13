@@ -15,6 +15,7 @@ import Combine
     private var spacerPadding: NSLayoutConstraint?
     private var spacerWidth: NSLayoutConstraint?
     private var screenFrames: [CGRect] = []
+    private var wakeLayoutTask: Task<Void, Never>?
     private let expandedLength: CGFloat = 0
     var onArrangementChanged: ((Bool) -> Void)?
     private(set) var isArranging = false {
@@ -52,12 +53,20 @@ import Combine
         NotificationCenter.default.addObserver(self, selector: #selector(screenParametersChanged),
                                                name: NSApplication.didChangeScreenParametersNotification,
                                                object: nil)
+        let workspace = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.didWakeNotification, NSWorkspace.screensDidWakeNotification] {
+            workspace.addObserver(self, selector: #selector(refreshAfterWake), name: name, object: nil)
+        }
+        for name in [NSWorkspace.willSleepNotification, NSWorkspace.screensDidSleepNotification] {
+            workspace.addObserver(self, selector: #selector(cancelWakeLayout), name: name, object: nil)
+        }
         if defaults.bool(forKey: "menuPocketEnabled") { setEnabled(true, startExpanded: false) }
     }
 
     func stop() {
         removeItems()
         NotificationCenter.default.removeObserver(self)
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
 
     func setEnabled(_ enabled: Bool) {
@@ -146,23 +155,40 @@ import Combine
     }
 
     @objc private func screenParametersChanged() {
-        // Display sleep, wake, and resolution changes post this notification too,
-        // so react only to an actual arrangement change and keep the current state.
         let frames = NSScreen.screens.map(\.frame)
-        guard frames != screenFrames else { return }
-        bar.close()
-        screenFrames = frames
-        // A new arrangement can strand the control off-screen; reveal only then.
-        if !isExpanded && !isControlReachable {
-            isArranging = false
-            isExpanded = true
+        guard !frames.isEmpty else { return }
+        if frames != screenFrames {
+            bar.close()
+            screenFrames = frames
         }
+        // Native hosts can relayout even when display geometry is unchanged.
+        // A temporarily offscreen arrow during sleep must not expand the group.
         updateAppearance()
     }
 
-    private var isControlReachable: Bool {
-        guard let frame = chevron?.button?.window?.frame else { return false }
-        return NSScreen.screens.contains { $0.frame.intersects(frame) }
+    @objc private func cancelWakeLayout() {
+        wakeLayoutTask?.cancel()
+        wakeLayoutTask = nil
+    }
+
+    @objc private func refreshAfterWake() {
+        cancelWakeLayout()
+        guard isEnabled else { return }
+        bar.close()
+        wakeLayoutTask = Task { [weak self] in
+            // Status-item hosting can finish after the initial wake notification.
+            for delay in [100, 300, 600] {
+                do { try await Task.sleep(for: .milliseconds(delay)) } catch { return }
+                guard let self, self.isEnabled else { return }
+                guard !NSScreen.screens.isEmpty else { continue }
+                self.screenFrames = NSScreen.screens.map(\.frame)
+                // Force a native relayout even if AppKit cached the old length.
+                // Increasing by one point keeps a collapsed spacer collapsed.
+                if let spacer = self.spacer { spacer.length += 1 }
+                self.updateAppearance()
+            }
+            self?.wakeLayoutTask = nil
+        }
     }
 
     private func updateAppearance() {
@@ -189,6 +215,7 @@ import Combine
     }
 
     private func removeItems() {
+        cancelWakeLayout()
         bar.close()
         // Release the wide spacer first, restoring all other apps' icons.
         if let spacer {
@@ -208,6 +235,43 @@ import Combine
 
 #if DEBUG
 extension MenuPocketController {
+    static func wakeCheck() async -> Bool {
+        let name = "Arc.MenuPocketWakeCheck." + UUID().uuidString
+        guard let defaults = UserDefaults(suiteName: name) else { return false }
+        defaults.set(true, forKey: "menuPocketEnabled")
+        let controller = MenuPocketController(defaults: defaults, itemPrefix: name)
+        defer {
+            controller.stop()
+            defaults.removePersistentDomain(forName: name)
+        }
+        controller.start()
+        try? await Task.sleep(for: .milliseconds(300))
+        guard let spacer = controller.spacer, !controller.isExpanded else { return false }
+        // Reproduce lost host layout without actually sleeping the user's Mac.
+        spacer.length = 1
+        NotificationCenter.default.post(name: NSApplication.didChangeScreenParametersNotification, object: NSApp)
+        guard !controller.isExpanded, spacer.length >= 500 else { return false }
+        let workspace = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.didWakeNotification, NSWorkspace.screensDidWakeNotification] {
+            spacer.length = 1
+            workspace.post(name: name, object: nil)
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !controller.isExpanded, spacer.length >= 500 else { return false }
+        }
+        // A second host reset after the first wake refresh is repaired too.
+        spacer.length = 1
+        try? await Task.sleep(for: .milliseconds(350))
+        guard !controller.isExpanded, spacer.length >= 500 else { return false }
+        controller.beginArrangement()
+        workspace.post(name: NSWorkspace.screensDidWakeNotification, object: nil)
+        try? await Task.sleep(for: .milliseconds(250))
+        guard controller.isExpanded, controller.isArranging, spacer.length == 8 else { return false }
+        controller.setEnabled(false)
+        guard controller.wakeLayoutTask == nil else { return false }
+        workspace.post(name: NSWorkspace.didWakeNotification, object: nil)
+        return controller.spacer == nil && controller.wakeLayoutTask == nil
+    }
+
     /// Exercises native status-item layout and target/action without user preferences.
     static func smokeCheck() async -> Bool {
         let name = "Arc.MenuPocketCheck." + UUID().uuidString
