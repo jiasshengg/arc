@@ -141,6 +141,52 @@ final class MenuPocketBarTests: XCTestCase {
         }
     }
 
+    @MainActor func testMenuDismissalReturnsIconAndClosingCancelsOldWatcher() async throws {
+        let original = CGRect(x: -3000, y: 0, width: 24, height: 24)
+        var itemFrame = original
+        let arrowFrame = CGRect(x: 900, y: 0, width: 18, height: 24)
+        let control = CGRect(x: 900, y: (NSScreen.screens.first?.frame.maxY ?? 0) - 24,
+                             width: 18, height: 24)
+        var moves = 0
+        let access = MenuPocketItemAccess(windows: {
+            [self.window(1, owner: 20, frame: itemFrame), self.window(2, owner: 20, frame: arrowFrame)]
+        }, move: { _, _, _, point, _ in
+            moves += 1
+            itemFrame.origin.x = point.x - itemFrame.width / 2
+            return true
+        })
+        var menuVisible = true
+        var menu = window(10, owner: 20, frame: CGRect(x: 900, y: 24, width: 200, height: 150))
+        menu[kCGWindowLayer as String] = Int(CGWindowLevelForKey(.popUpMenuWindow))
+        let bar = MenuPocketBar(itemAccess: access, visibleWindows: { menuVisible ? [menu] : [] })
+        defer { bar.close() }
+        XCTAssertTrue(access.show(original, beside: control))
+        bar.restoreAfterMenuDismissal(owner: 20, before: [])
+        try await Task.sleep(for: .milliseconds(250))
+        XCTAssertEqual(moves, 1, "Keep the icon visible while its menu is open")
+        // A submenu replaces the visible popup without ending selection.
+        menu[kCGWindowNumber as String] = 11
+        try await Task.sleep(for: .milliseconds(150))
+        XCTAssertEqual(moves, 1)
+        menuVisible = false
+        for _ in 0..<20 {
+            if !access.hasPendingItem { break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        XCTAssertEqual(itemFrame, original)
+        XCTAssertFalse(access.hasPendingItem)
+        XCTAssertEqual(moves, 2)
+
+        XCTAssertTrue(access.show(original, beside: control))
+        bar.restoreAfterMenuDismissal(owner: 20, before: [])
+        bar.close()
+        _ = access.restore()
+        XCTAssertTrue(access.show(original, beside: control))
+        let afterNewSelection = moves
+        try await Task.sleep(for: .milliseconds(1100))
+        XCTAssertEqual(moves, afterNewSelection, "A cancelled watcher must not return a later selection")
+    }
+
     @MainActor func testMenuTimeoutRequiresANewMenuFromTheSelectedApp() {
         let menu = [kCGWindowNumber as String: 10, kCGWindowOwnerPID as String: Int32(20),
                     kCGWindowLayer as String: Int(CGWindowLevelForKey(.popUpMenuWindow)),
