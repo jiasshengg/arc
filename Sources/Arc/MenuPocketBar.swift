@@ -264,14 +264,9 @@ import SwiftUI
         guard Self.canRetryMenuAction(error),
               let current = frame(of: element), current == settledFrame,
               Self.isOnScreen(current, screens: NSScreen.screens.map(\.frame)),
-              let down = CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown,
-                                 mouseCursorPosition: CGPoint(x: current.midX, y: current.midY), mouseButton: .left),
-              let up = CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp,
-                               mouseCursorPosition: CGPoint(x: current.midX, y: current.midY), mouseButton: .left) else { return false }
+              itemAccess.click(current) else { return false }
         // Close our panel before delivering a normal click to the original icon.
         dismissRow()
-        down.post(tap: .cghidEventTap)
-        up.post(tap: .cghidEventTap)
         return true
     }
 

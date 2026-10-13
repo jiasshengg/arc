@@ -98,22 +98,47 @@ final class MenuPocketBarTests: XCTestCase {
         XCTAssertEqual(bar.groupingBoundary(before: beforeRestore), beforeRestore.minX)
     }
 
-    func testPointerRestorationYieldsToMovementClicksAndScrolling() {
-        let point = CGPoint(x: 800, y: 300)
-        let counts: [UInt32] = Array(repeating: 10, count: 11)
-        let snapshot = MenuPocketPointerSnapshot(point: point, inputCounts: counts)
-        XCTAssertEqual(snapshot.restorePoint(inputCounts: counts), point)
-        for index in counts.indices {
-            var changed = counts
-            changed[index] += 1
-            XCTAssertNil(snapshot.restorePoint(inputCounts: changed),
-                         "New hardware input must prevent snapping to an old position")
-        }
+    func testPointerRestorationPreservesPhysicalDeltasDespiteScreenEdgeClamping() throws {
+        var snapshot = MenuPocketPointerSnapshot(point: CGPoint(x: 800, y: 300))
+        let event = try XCTUnwrap(CGEvent(mouseEventSource: nil, mouseType: .mouseMoved,
+                                         mouseCursorPosition: .zero, mouseButton: .left))
+        event.setIntegerValueField(.eventSourceUnixProcessID, value: 0)
+        event.setIntegerValueField(.eventSourceStateID, value: Int64(CGEventSourceStateID.hidSystemState.rawValue))
+        event.setDoubleValueField(.mouseEventDeltaX, value: 12)
+        event.setDoubleValueField(.mouseEventDeltaY, value: -6)
+        snapshot.record(event)
+        XCTAssertEqual(snapshot.point, CGPoint(x: 812, y: 294))
+        event.type = .leftMouseDragged
+        snapshot.record(event)
+        XCTAssertEqual(snapshot.point, CGPoint(x: 824, y: 288))
     }
 
-    func testPointerRestorationRejectsCounterWraparound() {
-        let snapshot = MenuPocketPointerSnapshot(point: .zero, inputCounts: [UInt32.max])
-        XCTAssertNil(snapshot.restorePoint(inputCounts: [0]))
+    func testPointerRestorationIgnoresSyntheticMotionClicksAndScrolling() throws {
+        let point = CGPoint(x: 800, y: 300)
+        let event = try XCTUnwrap(CGEvent(mouseEventSource: nil, mouseType: .mouseMoved,
+                                         mouseCursorPosition: .zero, mouseButton: .left))
+        event.setIntegerValueField(.eventSourceUnixProcessID, value: 0)
+        event.setIntegerValueField(.eventSourceStateID, value: Int64(CGEventSourceStateID.hidSystemState.rawValue))
+        event.setDoubleValueField(.mouseEventDeltaX, value: -800)
+        event.setDoubleValueField(.mouseEventDeltaY, value: -300)
+        var snapshot = MenuPocketPointerSnapshot(point: point)
+        event.setIntegerValueField(.eventSourceUserData, value: 123)
+        snapshot.record(event)
+        XCTAssertEqual(snapshot.point, point)
+        event.setIntegerValueField(.eventSourceUserData, value: 0)
+        event.setIntegerValueField(.eventSourceUnixProcessID, value: Int64(getpid()))
+        snapshot.record(event)
+        XCTAssertEqual(snapshot.point, point)
+        event.setIntegerValueField(.eventSourceUnixProcessID, value: 0)
+        event.setIntegerValueField(.eventSourceStateID, value: Int64(CGEventSourceStateID.privateState.rawValue))
+        snapshot.record(event)
+        XCTAssertEqual(snapshot.point, point)
+        event.setIntegerValueField(.eventSourceStateID, value: Int64(CGEventSourceStateID.hidSystemState.rawValue))
+        for type in [CGEventType.leftMouseUp, .leftMouseDown, .scrollWheel] {
+            event.type = type
+            snapshot.record(event)
+            XCTAssertEqual(snapshot.point, point)
+        }
     }
 
     @MainActor func testMenuTimeoutRequiresANewMenuFromTheSelectedApp() {
