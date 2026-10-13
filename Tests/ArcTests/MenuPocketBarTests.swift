@@ -5,6 +5,57 @@ import SwiftUI
 @testable import Arc
 
 final class MenuPocketBarTests: XCTestCase {
+    @MainActor func testFailedPressTriesShowMenuBeforeMouseFallback() async {
+        for failure in [AXError.failure, .cannotComplete, .actionUnsupported] {
+            var actions: [String] = []
+            let result = await MenuPocketBar.openAccessibilityMenu(perform: { action in
+                actions.append(action)
+                return action == kAXPressAction ? failure : .success
+            }, menuOpened: { false })
+            XCTAssertEqual(result, .success)
+            XCTAssertEqual(actions, [kAXPressAction, kAXShowMenuAction])
+        }
+    }
+
+    @MainActor func testFailedAccessibilityActionsAllowNativeClick() async {
+        for failure in [AXError.failure, .cannotComplete, .actionUnsupported] {
+            var actions: [String] = []
+            let result = await MenuPocketBar.openAccessibilityMenu(perform: {
+                actions.append($0)
+                return failure
+            }, menuOpened: { false })
+            XCTAssertEqual(actions, [kAXPressAction, kAXShowMenuAction])
+            XCTAssertTrue(MenuPocketBar.canRetryMenuAction(result))
+        }
+    }
+
+    @MainActor func testDelayedMenuAfterFailedReplyIsNotPressedAgain() async {
+        var actions: [String] = []
+        var observations = 0
+        let result = await MenuPocketBar.openAccessibilityMenu(perform: {
+            actions.append($0)
+            return .cannotComplete
+        }, menuOpened: {
+            observations += 1
+            return observations == 3
+        })
+        XCTAssertEqual(result, .success)
+        XCTAssertEqual(actions, [kAXPressAction])
+    }
+
+    @MainActor func testInvalidOrDisabledAccessibilityControlIsNotClicked() async {
+        for failure in [AXError.invalidUIElement, .apiDisabled] {
+            var actions: [String] = []
+            let result = await MenuPocketBar.openAccessibilityMenu(perform: {
+                actions.append($0)
+                return failure
+            }, menuOpened: { false })
+            XCTAssertEqual(result, failure)
+            XCTAssertEqual(actions, [kAXPressAction])
+            XCTAssertFalse(MenuPocketBar.canRetryMenuAction(result))
+        }
+    }
+
     @MainActor func testOverflowRowNeverShowsNativeScrollbars() async throws {
         let hosting = NSHostingView(rootView: MenuPocketBar.scrollbarPreview().frame(width: 320, height: 72))
         hosting.frame = CGRect(x: 0, y: 0, width: 320, height: 72)
