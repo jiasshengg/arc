@@ -27,6 +27,7 @@ struct IslandView: View {
         }
         return IslandLayout.size(expanded: model.expanded, hasMedia: model.visibleMedia.snapshot != nil, notch: model.notchSize)
     }
+    private var titleScrolls: Bool { model.shouldAnimatePlayback && !reduceMotion }
     private var outline: UnevenRoundedRectangle {
         UnevenRoundedRectangle(
             topLeadingRadius: model.attachesToTop ? 0 : (model.expanded ? 24 : 20),
@@ -262,10 +263,8 @@ struct IslandView: View {
                         playbackIndicator(track.isPlaying)
                     }
                     .overlay {
-                        Text(track.title)
-                            .font(.system(size: 12, weight: .medium))
-                            .lineLimit(1)
-                            .frame(maxWidth: .infinity)
+                        MarqueeText(text: track.title, font: .system(size: 12, weight: .medium),
+                                    alignment: .center, animating: titleScrolls)
                             .padding(.horizontal, 40)
                     }
                     .padding(.horizontal, 8)
@@ -285,7 +284,7 @@ struct IslandView: View {
                 HStack(spacing: 14) {
                     artwork(size: 56)
                     VStack(alignment: .leading, spacing: 5) {
-                        Text(track.title).font(.system(size: 15, weight: .semibold)).lineLimit(1)
+                        MarqueeText(text: track.title, font: .system(size: 15, weight: .semibold), animating: titleScrolls)
                         Text(track.artist.isEmpty ? "Unknown Artist" : track.artist)
                             .font(.system(size: 12)).foregroundStyle(.white.opacity(0.55)).lineLimit(1)
                     }
