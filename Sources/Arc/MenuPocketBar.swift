@@ -15,15 +15,27 @@ import SwiftUI
     private var panel: NSPanel?
     private var accessTask: Task<Void, Never>?
     private var presentationTask: Task<Void, Never>?
+    private var dismissalTask: Task<Void, Never>?
     var onVisibilityChanged: (() -> Void)?
     var currentControlFrame: (() -> CGRect?)?
     var currentDividerFrame: (() -> CGRect?)?
-    private let itemAccess = MenuPocketItemAccess()
+    private let itemAccess: MenuPocketItemAccess
+    private let visibleWindows: () -> [[String: Any]]
     private var controlFrame = CGRect.zero
     private var failureReason: String?
     var isVisible: Bool { panel?.isVisible == true }
 
+    init(itemAccess: MenuPocketItemAccess? = nil,
+         visibleWindows: @escaping () -> [[String: Any]] = {
+             CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] ?? []
+         }) {
+        self.itemAccess = itemAccess ?? MenuPocketItemAccess()
+        self.visibleWindows = visibleWindows
+    }
+
     func toggle(beside controlFrame: CGRect, before dividerFrame: CGRect) {
+        dismissalTask?.cancel()
+        dismissalTask = nil
         if panel != nil || presentationTask != nil {
             close()
             return
@@ -50,6 +62,8 @@ import SwiftUI
     }
 
     func close() {
+        dismissalTask?.cancel()
+        dismissalTask = nil
         _ = itemAccess.restore()
         dismissRow()
     }
@@ -245,32 +259,81 @@ import SwiftUI
 
         var owner: pid_t = 0
         AXUIElementGetPid(element, &owner)
-        let before = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] ?? []
-        var error = AXUIElementPerformAction(element, kAXPressAction as CFString)
-        if error == .actionUnsupported {
-            error = AXUIElementPerformAction(element, kAXShowMenuAction as CFString)
-        }
-        // Some apps enter menu tracking before replying to AXPress. The reply
-        // times out even though their native menu is already on screen.
-        let after = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] ?? []
-        let menuOpened = error == .cannotComplete && Self.hasOpenedMenu(owner: owner, before: before, after: after)
-        if error == .success || menuOpened {
-            if menuOpened { NSLog("Menu Pocket: AX reply timed out after native menu opened") }
+        let before = visibleWindows()
+        let error = await Self.openAccessibilityMenu(perform: {
+            AXUIElementPerformAction(element, $0 as CFString)
+        }, menuOpened: {
+            Self.hasOpenedMenu(owner: owner, before: before, after: self.visibleWindows())
+        })
+        guard !Task.isCancelled, panel === openingPanel else { return false }
+        if error == .success {
             dismissRow()
+            restoreAfterMenuDismissal(owner: owner, before: before)
             return true
         }
         failureReason = "Couldn’t Open The Original Menu"
         NSLog("Menu Pocket AX action result: %d", error.rawValue)
-        guard error == .actionUnsupported,
-              let down = CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown,
-                                 mouseCursorPosition: CGPoint(x: current.midX, y: current.midY), mouseButton: .left),
-              let up = CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp,
-                               mouseCursorPosition: CGPoint(x: current.midX, y: current.midY), mouseButton: .left) else { return false }
+        // Some apps advertise AXPress but fail to implement it reliably.
+        // A normal click can still open their original status control.
+        guard Self.canRetryMenuAction(error),
+              let current = frame(of: element), current == settledFrame,
+              Self.isOnScreen(current, screens: NSScreen.screens.map(\.frame)),
+              itemAccess.click(current) else { return false }
         // Close our panel before delivering a normal click to the original icon.
         dismissRow()
-        down.post(tap: .cghidEventTap)
-        up.post(tap: .cghidEventTap)
+        restoreAfterMenuDismissal(owner: owner, before: before)
         return true
+    }
+
+    func restoreAfterMenuDismissal(owner: pid_t, before: [[String: Any]]) {
+        dismissalTask?.cancel()
+        dismissalTask = Task { [weak self] in
+            var sawMenu = false
+            var openingSamples = 0
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
+                guard let self, self.itemAccess.hasPendingItem else { return }
+                let visible = Self.hasOpenedMenu(owner: owner, before: before, after: self.visibleWindows())
+                if visible {
+                    sawMenu = true
+                } else if sawMenu || openingSamples >= 9 {
+                    break
+                }
+                openingSamples += 1
+            }
+            guard let self, !Task.isCancelled else { return }
+            // Returning the icon is asynchronous too. Keep its placement until
+            // native geometry confirms success, without repeatedly restarting a drag.
+            for _ in 0..<20 {
+                guard !Task.isCancelled, self.itemAccess.hasPendingItem else { break }
+                _ = self.itemAccess.restore()
+                do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
+            }
+            self.dismissalTask = nil
+        }
+    }
+
+    static func canRetryMenuAction(_ error: AXError) -> Bool {
+        error == .actionUnsupported || error == .failure || error == .cannotComplete
+    }
+
+    static func openAccessibilityMenu(perform: (String) -> AXError,
+                                      menuOpened: () -> Bool) async -> AXError {
+        for action in [kAXPressAction, kAXShowMenuAction] {
+            guard !Task.isCancelled else { return .cannotComplete }
+            let error = perform(action)
+            if error == .success { return .success }
+            guard canRetryMenuAction(error) else { return error }
+            // Menu tracking can time out the AX reply. Allow presentation to
+            // settle before trying another action that could close the menu.
+            for _ in 0..<3 {
+                if menuOpened() { return .success }
+                do { try await Task.sleep(for: .milliseconds(50)) } catch { return .cannotComplete }
+            }
+            if menuOpened() { return .success }
+            if action == kAXShowMenuAction { return error }
+        }
+        return .actionUnsupported
     }
 
     static func hasOpenedMenu(owner: pid_t, before: [[String: Any]], after: [[String: Any]]) -> Bool {
@@ -280,7 +343,8 @@ import SwiftUI
             guard let number = window[kCGWindowNumber as String] as? Int,
                   !existing.contains(number),
                   (window[kCGWindowOwnerPID as String] as? Int32) == owner,
-                  (window[kCGWindowLayer as String] as? Int) == Int(CGWindowLevelForKey(.popUpMenuWindow)),
+                  let layer = window[kCGWindowLayer as String] as? Int,
+                  layer > 0, layer != Int(CGWindowLevelForKey(.statusWindow)),
                   let bounds = window[kCGWindowBounds as String] as? [String: Any],
                   let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return false }
             return frame.width > 0 && frame.height > 0

@@ -153,7 +153,8 @@ supported. Click the arrow when you’re finished arranging.
 
 Your apps keep running while their icons are hidden. You choose which icons
 belong in the group. Arc temporarily moves the selected icon to open its menu
-and returns it when you reopen the row. Icons from newly opened apps may appear
+and returns it automatically when the menu closes, such as when you click elsewhere
+or choose an action. Icons from newly opened apps may appear
 in the hidden group.
 
 The setup line only appears while you’re arranging icons. Arc remembers whether

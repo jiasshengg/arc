@@ -134,6 +134,19 @@ import ApplicationServices
             && abs(lhs.width - rhs.width) < 2 && abs(lhs.height - rhs.height) < 2
     }
 
+    func click(_ frame: CGRect) -> Bool {
+        guard let window = statusWindow(at: frame),
+              let number = window[kCGWindowNumber as String] as? Int,
+              let owner = window[kCGWindowOwnerPID as String] as? Int32,
+              let source = CGEventSource(stateID: .privateState),
+              let down = Self.event(.leftMouseDown, window: number,
+                                    at: CGPoint(x: frame.midX, y: frame.midY), command: false, owner: owner, source: source),
+              let up = Self.event(.leftMouseUp, window: number,
+                                  at: CGPoint(x: frame.midX, y: frame.midY), command: false, owner: owner, source: source) else { return false }
+        return delivery.send([down, up], owner: owner, release: up,
+                             forwardToOwner: false, didMove: { true })
+    }
+
     private func drag(window: Int, owner: pid_t, from: CGPoint, to: CGPoint, targetWindow: Int? = nil) -> Bool {
         if let move { return move(window, owner, from, to, targetWindow) }
         guard AXIsProcessTrusted(), let source = CGEventSource(stateID: .privateState),

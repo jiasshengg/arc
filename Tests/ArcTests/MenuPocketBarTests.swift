@@ -5,6 +5,57 @@ import SwiftUI
 @testable import Arc
 
 final class MenuPocketBarTests: XCTestCase {
+    @MainActor func testFailedPressTriesShowMenuBeforeMouseFallback() async {
+        for failure in [AXError.failure, .cannotComplete, .actionUnsupported] {
+            var actions: [String] = []
+            let result = await MenuPocketBar.openAccessibilityMenu(perform: { action in
+                actions.append(action)
+                return action == kAXPressAction ? failure : .success
+            }, menuOpened: { false })
+            XCTAssertEqual(result, .success)
+            XCTAssertEqual(actions, [kAXPressAction, kAXShowMenuAction])
+        }
+    }
+
+    @MainActor func testFailedAccessibilityActionsAllowNativeClick() async {
+        for failure in [AXError.failure, .cannotComplete, .actionUnsupported] {
+            var actions: [String] = []
+            let result = await MenuPocketBar.openAccessibilityMenu(perform: {
+                actions.append($0)
+                return failure
+            }, menuOpened: { false })
+            XCTAssertEqual(actions, [kAXPressAction, kAXShowMenuAction])
+            XCTAssertTrue(MenuPocketBar.canRetryMenuAction(result))
+        }
+    }
+
+    @MainActor func testDelayedMenuAfterFailedReplyIsNotPressedAgain() async {
+        var actions: [String] = []
+        var observations = 0
+        let result = await MenuPocketBar.openAccessibilityMenu(perform: {
+            actions.append($0)
+            return .cannotComplete
+        }, menuOpened: {
+            observations += 1
+            return observations == 3
+        })
+        XCTAssertEqual(result, .success)
+        XCTAssertEqual(actions, [kAXPressAction])
+    }
+
+    @MainActor func testInvalidOrDisabledAccessibilityControlIsNotClicked() async {
+        for failure in [AXError.invalidUIElement, .apiDisabled] {
+            var actions: [String] = []
+            let result = await MenuPocketBar.openAccessibilityMenu(perform: {
+                actions.append($0)
+                return failure
+            }, menuOpened: { false })
+            XCTAssertEqual(result, failure)
+            XCTAssertEqual(actions, [kAXPressAction])
+            XCTAssertFalse(MenuPocketBar.canRetryMenuAction(result))
+        }
+    }
+
     @MainActor func testOverflowRowNeverShowsNativeScrollbars() async throws {
         let hosting = NSHostingView(rootView: MenuPocketBar.scrollbarPreview().frame(width: 320, height: 72))
         hosting.frame = CGRect(x: 0, y: 0, width: 320, height: 72)
@@ -47,22 +98,93 @@ final class MenuPocketBarTests: XCTestCase {
         XCTAssertEqual(bar.groupingBoundary(before: beforeRestore), beforeRestore.minX)
     }
 
-    func testPointerRestorationYieldsToMovementClicksAndScrolling() {
+    func testPointerRestorationPreservesPhysicalDeltasDespiteScreenEdgeClamping() throws {
+        var snapshot = MenuPocketPointerSnapshot(point: CGPoint(x: 800, y: 300))
+        let event = try XCTUnwrap(CGEvent(mouseEventSource: nil, mouseType: .mouseMoved,
+                                         mouseCursorPosition: .zero, mouseButton: .left))
+        event.setIntegerValueField(.eventSourceUnixProcessID, value: 0)
+        event.setIntegerValueField(.eventSourceStateID, value: Int64(CGEventSourceStateID.hidSystemState.rawValue))
+        event.setDoubleValueField(.mouseEventDeltaX, value: 12)
+        event.setDoubleValueField(.mouseEventDeltaY, value: -6)
+        snapshot.record(event)
+        XCTAssertEqual(snapshot.point, CGPoint(x: 812, y: 294))
+        event.type = .leftMouseDragged
+        snapshot.record(event)
+        XCTAssertEqual(snapshot.point, CGPoint(x: 824, y: 288))
+    }
+
+    func testPointerRestorationIgnoresSyntheticMotionClicksAndScrolling() throws {
         let point = CGPoint(x: 800, y: 300)
-        let counts: [UInt32] = Array(repeating: 10, count: 11)
-        let snapshot = MenuPocketPointerSnapshot(point: point, inputCounts: counts)
-        XCTAssertEqual(snapshot.restorePoint(inputCounts: counts), point)
-        for index in counts.indices {
-            var changed = counts
-            changed[index] += 1
-            XCTAssertNil(snapshot.restorePoint(inputCounts: changed),
-                         "New hardware input must prevent snapping to an old position")
+        let event = try XCTUnwrap(CGEvent(mouseEventSource: nil, mouseType: .mouseMoved,
+                                         mouseCursorPosition: .zero, mouseButton: .left))
+        event.setIntegerValueField(.eventSourceUnixProcessID, value: 0)
+        event.setIntegerValueField(.eventSourceStateID, value: Int64(CGEventSourceStateID.hidSystemState.rawValue))
+        event.setDoubleValueField(.mouseEventDeltaX, value: -800)
+        event.setDoubleValueField(.mouseEventDeltaY, value: -300)
+        var snapshot = MenuPocketPointerSnapshot(point: point)
+        event.setIntegerValueField(.eventSourceUserData, value: 123)
+        snapshot.record(event)
+        XCTAssertEqual(snapshot.point, point)
+        event.setIntegerValueField(.eventSourceUserData, value: 0)
+        event.setIntegerValueField(.eventSourceUnixProcessID, value: Int64(getpid()))
+        snapshot.record(event)
+        XCTAssertEqual(snapshot.point, point)
+        event.setIntegerValueField(.eventSourceUnixProcessID, value: 0)
+        event.setIntegerValueField(.eventSourceStateID, value: Int64(CGEventSourceStateID.privateState.rawValue))
+        snapshot.record(event)
+        XCTAssertEqual(snapshot.point, point)
+        event.setIntegerValueField(.eventSourceStateID, value: Int64(CGEventSourceStateID.hidSystemState.rawValue))
+        for type in [CGEventType.leftMouseUp, .leftMouseDown, .scrollWheel] {
+            event.type = type
+            snapshot.record(event)
+            XCTAssertEqual(snapshot.point, point)
         }
     }
 
-    func testPointerRestorationRejectsCounterWraparound() {
-        let snapshot = MenuPocketPointerSnapshot(point: .zero, inputCounts: [UInt32.max])
-        XCTAssertNil(snapshot.restorePoint(inputCounts: [0]))
+    @MainActor func testMenuDismissalReturnsIconAndClosingCancelsOldWatcher() async throws {
+        let original = CGRect(x: -3000, y: 0, width: 24, height: 24)
+        var itemFrame = original
+        let arrowFrame = CGRect(x: 900, y: 0, width: 18, height: 24)
+        let control = CGRect(x: 900, y: (NSScreen.screens.first?.frame.maxY ?? 0) - 24,
+                             width: 18, height: 24)
+        var moves = 0
+        let access = MenuPocketItemAccess(windows: {
+            [self.window(1, owner: 20, frame: itemFrame), self.window(2, owner: 20, frame: arrowFrame)]
+        }, move: { _, _, _, point, _ in
+            moves += 1
+            itemFrame.origin.x = point.x - itemFrame.width / 2
+            return true
+        })
+        var menuVisible = true
+        var menu = window(10, owner: 20, frame: CGRect(x: 900, y: 24, width: 200, height: 150))
+        menu[kCGWindowLayer as String] = Int(CGWindowLevelForKey(.popUpMenuWindow))
+        let bar = MenuPocketBar(itemAccess: access, visibleWindows: { menuVisible ? [menu] : [] })
+        defer { bar.close() }
+        XCTAssertTrue(access.show(original, beside: control))
+        bar.restoreAfterMenuDismissal(owner: 20, before: [])
+        try await Task.sleep(for: .milliseconds(250))
+        XCTAssertEqual(moves, 1, "Keep the icon visible while its menu is open")
+        // A submenu replaces the visible popup without ending selection.
+        menu[kCGWindowNumber as String] = 11
+        try await Task.sleep(for: .milliseconds(150))
+        XCTAssertEqual(moves, 1)
+        menuVisible = false
+        for _ in 0..<20 {
+            if !access.hasPendingItem { break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        XCTAssertEqual(itemFrame, original)
+        XCTAssertFalse(access.hasPendingItem)
+        XCTAssertEqual(moves, 2)
+
+        XCTAssertTrue(access.show(original, beside: control))
+        bar.restoreAfterMenuDismissal(owner: 20, before: [])
+        bar.close()
+        _ = access.restore()
+        XCTAssertTrue(access.show(original, beside: control))
+        let afterNewSelection = moves
+        try await Task.sleep(for: .milliseconds(1100))
+        XCTAssertEqual(moves, afterNewSelection, "A cancelled watcher must not return a later selection")
     }
 
     @MainActor func testMenuTimeoutRequiresANewMenuFromTheSelectedApp() {

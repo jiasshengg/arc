@@ -4,6 +4,11 @@ import XCTest
 @testable import Arc
 
 final class MenuPocketArrangementTests: XCTestCase {
+    @MainActor func testWakeRepairsCollapsedHostLayoutAndPreservesArrangement() async {
+        let passed = await MenuPocketController.wakeCheck()
+        XCTAssertTrue(passed, "Wake must repair collapsed layout without changing arrangement or reviving disabled items")
+    }
+
     @MainActor func testArrangementHidesNativeIslandAndDisableRestoresIt() throws {
         let suite = "ArcArrangementTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))

@@ -6,6 +6,7 @@ import ApplicationServices
 @MainActor final class MenuPocketEventDelivery {
     private var events: [CGEvent] = []
     private var owner: pid_t = 0
+    private var forwardToOwner = true
     private var probe: CGEvent?
     private var processTap: CFMachPort?
     private var sessionTap: CFMachPort?
@@ -15,20 +16,32 @@ import ApplicationServices
     private var release: CGEvent?
     private var didMove: (() -> Bool)?
     private var savedPointer: MenuPocketPointerSnapshot?
+    private var pointerTap: CFMachPort?
+    private var pointerSource: CFRunLoopSource?
     private var pointerHidden = false
     private var pointerTask: Task<Void, Never>?
     var isRestoringPointer: Bool { pointerTask != nil }
     var isBusy: Bool { !events.isEmpty }
 
-    func send(_ events: [CGEvent], owner: pid_t, release: CGEvent, didMove: @escaping () -> Bool) -> Bool {
-        guard !isBusy, !events.isEmpty else { return false }
-        // A previous delayed cleanup must not warp over a new user click.
-        pointerTask?.cancel()
-        pointerTask = nil
-        if pointerHidden { CGDisplayShowCursor(CGMainDisplayID()); pointerHidden = false }
-        savedPointer = CGEvent(source: nil).map {
-            MenuPocketPointerSnapshot(point: $0.location, inputCounts: MenuPocketPointerSnapshot.hardwareInputCounts())
+    func send(_ events: [CGEvent], owner: pid_t, release: CGEvent,
+              forwardToOwner: Bool = true, didMove: @escaping () -> Bool) -> Bool {
+        guard !isBusy, !isRestoringPointer, !events.isEmpty,
+              let pointer = CGEvent(source: nil) else { return false }
+        savedPointer = MenuPocketPointerSnapshot(point: pointer.location)
+        // Session delivery moves the cursor to the hidden icon's offscreen
+        // coordinates. Preserve real mouse deltas, ignoring Arc's own events.
+        let context = Unmanaged.passUnretained(self).toOpaque()
+        let mask = [CGEventType.mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged]
+            .reduce(CGEventMask(0)) { $0 | (1 << $1.rawValue) }
+        pointerTap = CGEvent.tapCreate(tap: .cghidEventTap, place: .headInsertEventTap,
+            options: .listenOnly, eventsOfInterest: mask, callback: Self.pointerCallback, userInfo: context)
+        guard let pointerTap, let source = CFMachPortCreateRunLoopSource(nil, pointerTap, 0) else {
+            finishPointerRestoration()
+            return false
         }
+        pointerSource = source
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+        CGEvent.tapEnable(tap: pointerTap, enable: true)
         if savedPointer != nil {
             let result = CGDisplayHideCursor(CGMainDisplayID())
             pointerHidden = result == .success
@@ -36,6 +49,7 @@ import ApplicationServices
         }
         self.events = events
         self.owner = owner
+        self.forwardToOwner = forwardToOwner
         self.release = release
         self.didMove = didMove
         return beginEvent()
@@ -48,17 +62,13 @@ import ApplicationServices
         if wasBusy { release?.post(tap: .cgSessionEventTap) }
         release = nil
         didMove = nil
-        restorePointer(immediately: true)
+        restorePointer()
     }
 
-    private func restorePointer(immediately: Bool) {
+    private func restorePointer() {
         pointerTask?.cancel()
         pointerTask = nil
         guard savedPointer != nil else { return }
-        if immediately {
-            finishPointerRestoration()
-            return
-        }
         // The owner can still handle the forwarded mouse-up after receipt.
         pointerTask = Task { [self] in
             do { try await Task.sleep(for: .milliseconds(50)) } catch { return }
@@ -67,12 +77,14 @@ import ApplicationServices
     }
 
     private func finishPointerRestoration() {
-        if let point = savedPointer?.restorePoint(inputCounts: MenuPocketPointerSnapshot.hardwareInputCounts()) {
-            let result = CGWarpMouseCursorPosition(point)
+        if let savedPointer {
+            let result = CGWarpMouseCursorPosition(savedPointer.point)
             NSLog("Menu Pocket: cursor restored: %d", result.rawValue)
-        } else {
-            NSLog("Menu Pocket: cursor restoration skipped after hardware input")
         }
+        if let pointerSource { CFRunLoopRemoveSource(CFRunLoopGetMain(), pointerSource, .commonModes) }
+        if let pointerTap { CFMachPortInvalidate(pointerTap) }
+        pointerSource = nil
+        pointerTap = nil
         savedPointer = nil
         pointerTask = nil
         if pointerHidden { CGDisplayShowCursor(CGMainDisplayID()); pointerHidden = false }
@@ -129,12 +141,14 @@ import ApplicationServices
         }
         guard tag == marker, let next = events.first, event.type == next.type else { return false }
         clearTaps()
-        next.postToPid(owner)
+        // A visible icon receives a normal click through the session once.
+        // Hidden-item moves additionally require the native owner delivery.
+        if forwardToOwner { next.postToPid(owner) }
         events.removeFirst()
         if events.isEmpty {
             release = nil
             didMove = nil
-            restorePointer(immediately: false)
+            restorePointer()
             NSLog("Menu Pocket: native move events delivered")
         } else {
             timeout = Task { [weak self] in
@@ -174,22 +188,26 @@ import ApplicationServices
         let consume = MainActor.assumeIsolated { delivery.received(event) }
         return consume ? nil : Unmanaged.passUnretained(event)
     }
+
+    private static let pointerCallback: CGEventTapCallBack = { _, _, event, context in
+        guard let context else { return Unmanaged.passUnretained(event) }
+        let delivery = Unmanaged<MenuPocketEventDelivery>.fromOpaque(context).takeUnretainedValue()
+        MainActor.assumeIsolated { delivery.savedPointer?.record(event) }
+        return Unmanaged.passUnretained(event)
+    }
 }
 
-/// Only restore synthetic cursor movement; subsequent physical input wins.
+/// Preserve physical movement relative to the pre-drag position, even while
+/// synthetic events have temporarily clamped the actual cursor to a screen edge.
 struct MenuPocketPointerSnapshot {
-    let point: CGPoint
-    let inputCounts: [UInt32]
+    private(set) var point: CGPoint
 
-    func restorePoint(inputCounts current: [UInt32]) -> CGPoint? {
-        current == inputCounts ? point : nil
-    }
-
-    static func hardwareInputCounts() -> [UInt32] {
-        let types: [CGEventType] = [.mouseMoved, .leftMouseDragged, .rightMouseDragged,
-                                    .otherMouseDragged, .leftMouseDown, .leftMouseUp,
-                                    .rightMouseDown, .rightMouseUp, .otherMouseDown,
-                                    .otherMouseUp, .scrollWheel]
-        return types.map { CGEventSource.counterForEventType(.hidSystemState, eventType: $0) }
+    mutating func record(_ event: CGEvent) {
+        guard [.mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged].contains(event.type),
+              event.getIntegerValueField(.eventSourceUnixProcessID) == 0,
+              event.getIntegerValueField(.eventSourceUserData) == 0,
+              event.getIntegerValueField(.eventSourceStateID) == Int64(CGEventSourceStateID.hidSystemState.rawValue) else { return }
+        point.x += event.getDoubleValueField(.mouseEventDeltaX)
+        point.y += event.getDoubleValueField(.mouseEventDeltaY)
     }
 }
